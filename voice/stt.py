@@ -25,10 +25,12 @@ _add_nvidia_dlls()
 
 from faster_whisper import WhisperModel  # noqa: E402
 
+import config  # noqa: E402  (loads .env: her name, KNOWN_EMAIL_DOMAINS below)
+NAME = config.ASSISTANT_NAME.strip() or "Keena"
 # Whisper doesn't know the name "Keena": it wrote "Kina", "Kena", "Hina", "Tina", "Hekina" (measured, 4 voices).
 # The prompt nudges it toward the right words; names it wouldn't know otherwise ("Ravi" was heard as "money").
-HINT = ("Hey Keena. Keena, open Chrome. Set the volume to 40. Play on YouTube. Thanks Keena.")
-import config  # noqa: E402,F401  (loads .env, for KNOWN_EMAIL_DOMAINS below)
+# Her name comes from .env ASSISTANT_NAME: with "Edith" in the prompt, Indian voices stopped coming out as "eat it" / "Idit".
+HINT = f"Hey {NAME}. {NAME}, open Chrome. Set the volume to 40. Play on YouTube. Thanks {NAME}."
 # his email domains (.env KNOWN_EMAIL_DOMAINS): "arjun at pixelcraftstudio.com" was heard as "Pixelcraftstudi0" / "Pxlstudio"
 # names Whisper wouldn't know (people, companies): .env HEAR_NAMES, comma separated ("Ravi" was heard as "money")
 HINT += "".join(f" {n.strip()}." for n in os.getenv("HEAR_NAMES", "").split(",") if n.strip())
@@ -36,9 +38,18 @@ HINT += "".join(f" Email: name@{d}." for d in os.getenv("KNOWN_EMAIL_DOMAINS", "
 
 # Her name as Whisper writes it. STRONG: rare spellings, count anywhere. WEAK: real names (Hina, Tina, Gina), count
 # only right after "hey" or as the first word. GLUED: "Hey Keena" run together.
-NAME_STRONG = r"keena|keenah|keena's|kina|kinah|kena|keina|qina|kiina"
-NAME_WEAK = r"hina|tina|gina|heena|keeno"
-NAME_GLUED = r"hekina|heikina|heykina|hikina|heykeena|hikeena|heykena"
+# Another name (.env ASSISTANT_NAME): the name itself is STRONG, and .env WAKE_ALIASES (comma separated, what
+# Whisper writes on your mic, e.g. "edit,idit") are WEAK, so "edit the file" doesn't wake her.
+_name = re.escape(NAME.lower())
+_aliases = [re.escape(a.strip().lower()) for a in os.getenv("WAKE_ALIASES", "").split(",") if a.strip()]
+if NAME.lower() == "keena":
+    NAME_STRONG = r"keena|keenah|keena's|kina|kinah|kena|keina|qina|kiina"
+    NAME_WEAK = "|".join([r"hina|tina|gina|heena|keeno"] + _aliases)
+    NAME_GLUED = r"hekina|heikina|heykina|hikina|heykeena|hikeena|heykena"
+else:
+    NAME_STRONG = rf"{_name}|{_name}'s"
+    NAME_WEAK = "|".join(_aliases) or r"(?!x)x"  # (?!x)x never matches: no weak spellings
+    NAME_GLUED = rf"hey{_name}|hi{_name}"
 
 # Phrases Whisper "hears" in silence/noise (it was trained on lots of YouTube videos)
 HALLUCINATION = re.compile(r"^\W*(?:(?:thanks?|thank you) (?:so much )?for watching|(?:please )?subscribe(?: to (?:my|the|our) channel)?.*|"
