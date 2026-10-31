@@ -15,7 +15,7 @@ VERBS = (r"open|close|quit|exit|launch|start|stop|play|pause|resume|skip|mute|un
          r"minimize|maximize|switch|install|download|bring up|pull up|put on|list|look for|compare|"
          r"write|rewrite|retype|update|edit|revise|redo|paste|replace")
 # Start of a clause: start of text, after punctuation, or after polite/linking words
-CLAUSE = (r"(?:^|[.,!?;:]\s*|\b(?:and|then|also|so|please|now|jarvis|keena|kina|kena|can you|could you|would you|will you|"
+CLAUSE = (r"(?:^|[.,!?;:]\s*|\b(?:and|then|also|so|please|now|jarvis|edith|keena|kina|kena|can you|could you|would you|will you|"
           r"i want you to|i need you to|go ahead and|just|help me|help me to|can you help me|can you help me to)\s+)")
 ORDER = re.compile(CLAUSE + rf"(?:{VERBS})\b(?!\s+(?:me know|me think|it go|it be|on\b))")
 

@@ -29,7 +29,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 try:
     from config import ASSISTANT_NAME as NAME
 except Exception:
-    NAME = "Keena"
+    NAME = "Edith"
 KEY_FILE = os.path.join(ROOT, "data", "remote_key.txt")
 PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "page.html")
 TAILSCALE = ipaddress.ip_network("100.64.0.0/10")
@@ -106,7 +106,7 @@ class Turn:
         from voice.hud_client import card_text
         self.cards.append(card_text(name, args))
         if name in SLOW_TOOLS and not getattr(self, "acked", False):
-            # "Keena, mail my CTO..." -> "On it." right away (shot 2), not after the mail is typed
+            # "Edith, mail my CTO..." -> "On it." right away (shot 2), not after the mail is typed
             self.acked = True
             self.out.put({"progress": "On it.", "turn": self.id, "cards": list(self.cards)})
 

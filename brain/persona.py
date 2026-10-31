@@ -1,4 +1,4 @@
-"""Who Keena is. One place for every reply: the companion brain (PERSONA), the tool brain (CHARACTER)
+"""Who Edith is. One place for every reply: the companion brain (PERSONA), the tool brain (CHARACTER)
 and the instant router/smalltalk/main-loop lines (LINES).
 
 Keep this SHORT: every token here is read on every chat turn. Order matters for speed:
@@ -79,7 +79,7 @@ def line(kind):
 
 
 def startup_greeting(reminders=()):
-    """'Good afternoon, Sam! Keena here. You have 2 reminders today: ...' Real data only, kept short."""
+    """'Good afternoon, Sam! Edith here. You have 2 reminders today: ...' Real data only, kept short."""
     hour = datetime.now().hour
     if hour < 5:
         text = f"Still up, {USER_NAME}? I'm here."

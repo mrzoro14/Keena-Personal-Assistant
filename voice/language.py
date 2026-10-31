@@ -1,4 +1,4 @@
-"""Keena understands Tamil, Tanglish and English, and always answers in English.
+"""Edith understands Tamil, Tanglish and English, and always answers in English.
 
 Hearing is local first: the PC's English Whisper (0.1 s). When it wasn't sure (Tamil forced through the English-only
 model comes out as confident-sounding nonsense with a low score: "Noodle Sami Klandra" for "noodles samaikka

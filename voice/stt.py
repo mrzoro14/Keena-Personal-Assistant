@@ -26,7 +26,7 @@ _add_nvidia_dlls()
 from faster_whisper import WhisperModel  # noqa: E402
 
 import config  # noqa: E402  (loads .env: her name, KNOWN_EMAIL_DOMAINS below)
-NAME = config.ASSISTANT_NAME.strip() or "Keena"
+NAME = config.ASSISTANT_NAME.strip() or "Edith"
 # Whisper doesn't know the name "Keena": it wrote "Kina", "Kena", "Hina", "Tina", "Hekina" (measured, 4 voices).
 # The prompt nudges it toward the right words; names it wouldn't know otherwise ("Ravi" was heard as "money").
 # Her name comes from .env ASSISTANT_NAME: with "Edith" in the prompt, Indian voices stopped coming out as "eat it" / "Idit".

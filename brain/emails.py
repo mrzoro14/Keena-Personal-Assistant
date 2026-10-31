@@ -1,6 +1,6 @@
 """Spoken email addresses -> real ones.
 
-Saying an address out loud always reaches Keena as words: "arjun at pixelcraftstudio dot com". It was saved like that
+Saying an address out loud always reaches Edith as words: "arjun at pixelcraftstudio dot com". It was saved like that
 (no "@"), so nothing recognised it as an address, and Whisper heard the domain as "Pixelcraftstudi0" / "Pxlstudio".
 
 - "x at y dot com" / "x at y.com" -> "x@y.com"

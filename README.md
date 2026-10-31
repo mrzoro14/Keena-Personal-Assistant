@@ -1,6 +1,6 @@
 <div align="center">
 
-# Keena
+# Edith
 
 **A voice AI companion that lives on your Windows PC.**
 Talk to her in English, Tamil or Tanglish. She answers in a natural voice, remembers what matters to you,
@@ -22,12 +22,12 @@ and actually gets things done on your computer.
 
 ## Overview
 
-Keena is an open-source personal assistant built around a **local large language model** (Qwen 3 8B, served by
+Edith is an open-source personal assistant built around a **local large language model** (Qwen 3 8B, served by
 [Ollama](https://ollama.com)) running on your own graphics card. There is no subscription and no cloud chatbot behind
 her: the reasoning happens on your machine. Around that brain sit an instant command router, a set of PC and browser
 tools, a memory store, a safety layer enforced in code, a pink arc-reactor HUD, and a phone remote.
 
-> Say **"Hey Keena"**, wait for the soft chime, and talk. After she answers, keep talking for a few seconds without
+> Say **"Hey Edith"**, wait for the soft chime, and talk. After she answers, keep talking for a few seconds without
 > repeating her name.
 
 ## Features
@@ -44,12 +44,12 @@ tools, a memory store, a safety layer enforced in code, a pink arc-reactor HUD, 
 | **Email** | Opens Gmail, types the mail live, asks before sending | "Draft a mail to Arjun about the demo and send it" |
 | **Memory** | Remembers only what you ask; recalls and forgets on request; summarises past conversations | "Remember that my gym is at 6 AM" |
 | **Reminders** | Reminders, timers and notes, announced on time | "Remind me to call mom at 6 PM" |
-| **Phone remote** | A private web app on your phone with the same HUD and hands-free "Hey Keena" | Pair once with a QR code |
+| **Phone remote** | A private web app on your phone with the same HUD and hands-free "Hey Edith" | Pair once with a QR code |
 | **HUD** | Animated corner orb showing state, actions and the sentence being spoken; full-screen mode | "Big screen mode" |
 
 ## System requirements
 
-Keena's brain (about 5.6 GB) and her speech recognition (about 0.5-1 GB) run **on the graphics card at the same time**.
+Edith's brain (about 5.6 GB) and her speech recognition (about 0.5-1 GB) run **on the graphics card at the same time**.
 On an 8 GB card roughly 6.8 GB is in use, which is why 8 GB of VRAM is the practical minimum.
 
 | Component | Minimum | Recommended |
@@ -71,11 +71,11 @@ On an 8 GB card roughly 6.8 GB is in use, which is why 8 GB of VRAM is the pract
 | **AMD Radeon, 8 GB+**, supported by Ollama (mainly RX 6800 and newer, RX 7000 series) | **Experimental, untested** | GPU, via Ollama's AMD support | CPU, about 1-1.5 s per sentence |
 | Intel Arc, integrated graphics | Not supported | CPU only, too slow | CPU |
 
-Whisper's GPU mode needs NVIDIA CUDA, so on AMD it runs on the processor: Keena works the same, but every command
+Whisper's GPU mode needs NVIDIA CUDA, so on AMD it runs on the processor: Edith works the same, but every command
 takes about 1-1.5 s longer (measured: 1.4 s for a 5.5-second sentence on the CPU, versus about 0.2 s on an RTX 4060).
 Set `WHISPER_DEVICE=cpu` in `.env`, and check Ollama's list of supported AMD cards; `ollama ps` must show **GPU**.
 
-**Not supported:** macOS and Linux (Keena automates Windows itself). Cards with 6 GB can run the smaller
+**Not supported:** macOS and Linux (Edith automates Windows itself). Cards with 6 GB can run the smaller
 `qwen3:4b-instruct` model with reduced quality.
 
 ## Quick start
@@ -117,7 +117,7 @@ and create an `about_me.txt` profile (one fact per line, for example `City: Chen
 
 ```powershell
 python main.py --text      # type to her first: checks the brain and tools
-python main.py             # voice mode: say "Hey Keena"
+python main.py             # voice mode: say "Hey Edith"
 ```
 
 ## How it works
@@ -155,7 +155,7 @@ web answers 2-4 s; Tamil input adds 2-3 s.
 
 ## Configuration
 
-All settings live in `.env` (copied from [`.env.example`](.env.example)). Restart Keena after changing them.
+All settings live in `.env` (copied from [`.env.example`](.env.example)). Restart Edith after changing them.
 
 <details>
 <summary><b>Identity and voice</b></summary>
@@ -163,7 +163,7 @@ All settings live in `.env` (copied from [`.env.example`](.env.example)). Restar
 | Variable | Default | Description |
 |---|---|---|
 | `JARVIS_USER` | `friend` | Your name; she addresses you by it |
-| `ASSISTANT_NAME` | `Keena` | Her name, also used as the wake word |
+| `ASSISTANT_NAME` | `Edith` | Her name, also used as the wake word |
 | `JARVIS_VOICE` | `en-US-AvaNeural` | Any Edge neural voice (`en-US-EmmaNeural`, `en-IN-NeerjaNeural`, `en-GB-SoniaNeural`...) |
 | `VOICE_RATE` | `+0%` | Speaking speed, e.g. `+8%` or `-5%` |
 | `JARVIS_CITY` | `Chennai` | Default city for weather |
@@ -207,7 +207,7 @@ All settings live in `.env` (copied from [`.env.example`](.env.example)). Restar
 
 | Variable | Default | Description |
 |---|---|---|
-| `BROWSER_CONTROL` | `1` | Open pages in Keena's own Chrome window so she can act on them |
+| `BROWSER_CONTROL` | `1` | Open pages in Edith's own Chrome window so she can act on them |
 | `BROWSER_PORT` | `9229` | Chrome DevTools port for her window |
 | `CHROME_PATH` | *(auto)* | Path to `chrome.exe` if it isn't found automatically |
 | `REMOTE` | `1` | Phone remote server |
@@ -271,14 +271,14 @@ Safety rules are enforced in code, not only in prompts:
 
 | Symptom | Resolution |
 |---|---|
-| *Can't reach Ollama* | Start Ollama from the Start menu, then run Keena again. |
+| *Can't reach Ollama* | Start Ollama from the Start menu, then run Edith again. |
 | Slow replies, or `ollama ps` shows CPU | Not enough free VRAM: close games and GPU-heavy apps. |
-| She never hears "Hey Keena" | Run `python main.py --mic-test`, set `MIC_DEVICE`, adjust `SILENCE_RMS`. |
+| She never hears "Hey Edith" | Run `python main.py --mic-test`, set `MIC_DEVICE`, adjust `SILENCE_RMS`. |
 | She cuts you off / keeps listening | Raise or lower `SILENCE_RMS` and `SILENCE_SECONDS`. |
 | No voice, or *Voice error 403* | Check the internet connection; run `pip install -U edge-tts`. |
 | Whisper GPU errors at startup | NVIDIA: reinstall `nvidia-cublas-cu12` and `nvidia-cudnn-cu12` (Quick start, step 3). AMD: set `WHISPER_DEVICE=cpu`. |
 | AMD: `ollama ps` shows CPU | Your Radeon isn't supported by Ollama, or the driver is old: update AMD Adrenalin and check Ollama's GPU list. |
-| Gmail shows a Google sign-up page | Sign in to Gmail once in Keena's own Chrome window. |
+| Gmail shows a Google sign-up page | Sign in to Gmail once in Edith's own Chrome window. |
 | *Web search isn't set up* | Add `LANGSEARCH_API_KEY` to `.env`. |
 | Tamil isn't understood | Add `GEMINI_API_KEY` to `.env`; free keys have a daily limit. |
 | Phone can't connect | Same Wi-Fi as the PC; allow Python through Windows Firewall; run `python -m remote.pair` again. |
@@ -302,7 +302,7 @@ keena/
 │   └── emails.py        Spoken email addresses to real ones
 ├── tools/
 │   ├── pc_tools.py      PC control and the tool registry
-│   ├── browser.py       Keena's own Chrome window (Playwright): shopping, Gmail, page reading
+│   ├── browser.py       Edith's own Chrome window (Playwright): shopping, Gmail, page reading
 │   ├── extras.py        Reminders, notes, weather, Wikipedia, files, calculator
 │   ├── web.py           Web search
 │   └── apps.py          Installed app and game finder

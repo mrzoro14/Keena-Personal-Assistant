@@ -387,7 +387,7 @@ def _compose_page():
 
 
 def _gmail_compose(to, subject, body, typing_delay=12):
-    """Open (or reuse) Gmail's compose window in Keena's Chrome and TYPE the mail in, visibly. To and Subject come
+    """Open (or reuse) Gmail's compose window in Edith's Chrome and TYPE the mail in, visibly. To and Subject come
     in with the address; the body is typed so he sees it being written. Never sends."""
     import urllib.parse
     page = _compose_page()
@@ -428,7 +428,7 @@ def _gmail_compose(to, subject, body, typing_delay=12):
 
 
 def _gmail_send():
-    """Click Send in the compose window Keena filled, and say so only once Gmail confirms it."""
+    """Click Send in the compose window Edith filled, and say so only once Gmail confirms it."""
     page = _compose_page()
     if page is None:
         raise BrowserError("There's no draft open in Gmail to send.")
@@ -640,7 +640,7 @@ def gmail_send():
 
 
 def gmail_open():
-    """Is a draft Keena typed still open in Gmail?"""
+    """Is a draft Edith typed still open in Gmail?"""
     try:
         return _call(lambda: _compose_page() is not None, timeout=10) if _port_open() else False
     except Exception:

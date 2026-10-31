@@ -9,8 +9,8 @@ import re
 from config import ROUTINES
 from tools.pc_tools import SITE_ALIASES, SITE_SEARCH
 
-POLITE = r"(?:(?:hey |ok |okay )?(?:keena|kina|kena|jarvis)[, ]*)?(?:can you |could you |would you |will you |please |kindly |just |now |go ahead and |okay |ok |so |alright |and |also |hey )*"
-TAIL = r"(?: for me)?(?: please)?(?: now)?(?: (?:keena|kina|kena|jarvis))?[.!?]*$"
+POLITE = r"(?:(?:hey |ok |okay )?(?:edith|keena|kina|kena|jarvis)[, ]*)?(?:can you |could you |would you |will you |please |kindly |just |now |go ahead and |okay |ok |so |alright |and |also |hey )*"
+TAIL = r"(?: for me)?(?: please)?(?: now)?(?: (?:edith|keena|kina|kena|jarvis))?[.!?]*$"
 
 WEBSITES = {
     "youtube": "youtube.com", "gmail": "mail.google.com", "google": "google.com",
@@ -25,7 +25,7 @@ KEY_NAMES = {"control": "ctrl", "escape": "esc", "windows": "win", "window": "wi
 KNOWN_KEYS = {"ctrl", "alt", "shift", "win", "enter", "esc", "tab", "space", "delete", "backspace", "up", "down", "left",
               "right", "home", "end", "pageup", "pagedown", "f1", "f2", "f3", "f4", "f5", "f11", "f12"} | \
              set("abcdefghijklmnopqrstuvwxyz0123456789")
-_FILLER_WORDS ={"yeah", "yes", "yep", "ok", "okay", "so", "and", "please", "jarvis", "keena", "kina", "kena", "bro", "hey", "i", "do", "just"}
+_FILLER_WORDS ={"yeah", "yes", "yep", "ok", "okay", "so", "and", "please", "jarvis", "edith", "keena", "kina", "kena", "bro", "hey", "i", "do", "just"}
 # "remember when we talked about..." / "remember what I said?" are questions about the past, not things to save
 NOT_A_QUESTION = r"(?!(?:when|what|how|why|who|where|if|the time|me)\b)(?!.*\?\s*$)"
 _SITES = [s for s in (*SITE_SEARCH, *SITE_ALIASES) if s not in ("youtube", "yt", "google", "mail", "x")]
@@ -75,7 +75,7 @@ def _route_calculator(t):
         return [("show_in_calculator", {"expression": _last_math["expr"], "answer": _last_math["answer"]})]
     rest = CALC.sub(" ", t)
     rest = re.sub(r"\b(?:can you|could you|please|kindly|able to|and|then|open|type|find|calculate|what is|what's|"
-                  r"do|show|tell me|for me|(?:keena|kina|kena|jarvis))\b", " ", rest, flags=re.I)
+                  r"do|show|tell me|for me|(?:edith|keena|kina|kena|jarvis))\b", " ", rest, flags=re.I)
     rest = re.sub(r"^\s*(?:plus|and)\s+", "", re.sub(r"\s+", " ", rest)).strip(" ,.?")
     e = math_expression(rest) if rest else None
     if not e:
@@ -239,7 +239,7 @@ def route(text):
     if m:
         return [("remember", {"fact": _to_third_person(m[1])})]
     # "My birthday is August 11, 2003. Remember that." -> the sentence before it, instantly
-    m = re.match(r"(.+?)[.,!]?\s+(?:(?:please|(?:keena|kina|kena|jarvis))[, ]+)?(?:remember|don'?t forget|note) (?:that|this|it)(?: please)?[.!]*$",
+    m = re.match(r"(.+?)[.,!]?\s+(?:(?:please|(?:edith|keena|kina|kena|jarvis))[, ]+)?(?:remember|don'?t forget|note) (?:that|this|it)(?: please)?[.!]*$",
                  re.sub(r"\s+", " ", text.strip()), re.I)
     # the part before must be a real statement: "Yeah, I remember that." once saved the fact "Yeah, he"
     content = [w for w in re.findall(r"[a-z0-9']+", m[1].lower()) if w not in _FILLER_WORDS] if m else []
@@ -259,8 +259,8 @@ def route(text):
 
 
 # "Yeah, remember that." / "remember it" / "I remember that" right after he said something worth keeping
-_REMEMBER_ALONE = re.compile(r"^(?:(?:yeah|yes|yep|ok|okay|so|and|please|(?:keena|kina|kena|jarvis)|bro|hey)[,.!]? )*(?:i )?(?:do )?"
-                             r"(?:remember|note|save) (?:that|this|it)(?: (?:please|(?:keena|kina|kena|jarvis)|bro))?[.!]*$")
+_REMEMBER_ALONE = re.compile(r"^(?:(?:yeah|yes|yep|ok|okay|so|and|please|(?:edith|keena|kina|kena|jarvis)|bro|hey)[,.!]? )*(?:i )?(?:do )?"
+                             r"(?:remember|note|save) (?:that|this|it)(?: (?:please|(?:edith|keena|kina|kena|jarvis)|bro))?[.!]*$")
 _FORGET_LAST = re.compile(POLITE + r"(?:forget|delete|erase|remove)(?: about)? (?:that|it|this|what i (?:just )?(?:said|told you))"
                           r"(?: from (?:your )?memory)?" + TAIL)
 _FORGET_ABOUT = re.compile(POLITE + r"(?:forget|delete|erase)(?: everything| all(?: you know)?| what you know)? about (.+?)" + TAIL)
@@ -543,7 +543,7 @@ def _route_one(t):
         if _m(rf"(?:start |run |activate |enable |turn on |switch to )?(?:the )?{re.escape(name)}", t):
             return [("run_routine", {"name": name})]
 
-    # the mail Keena typed into Gmail: send it (she asks "Send it to ...?" first)
+    # the mail Edith typed into Gmail: send it (she asks "Send it to ...?" first)
     if _m(r"(?:yes,? |ok(?:ay)?,? )?send (?:it|that|the (?:e?mail|mail|draft|message))(?: now)?|send it off|hit send", t):
         return [("send_draft", {})]
     # The Notepad email draft -> one Gmail compose window
@@ -586,22 +586,22 @@ from brain.memory import conjugate_he  # noqa: E402
 
 _SMALLTALK = [
     (r"(?:(?:that'?s|that is|it'?s|you'?re|you are) )?(?:very |so |really )?(?:good|great|nice|awesome|amazing|perfect|"
-     r"brilliant|excellent|cool|fantastic|the best)(?: work| job| one)?(?:,? (?:keena|kina|kena|jarvis))?(?:[.!,]* (?:good|great|nice) (?:work|job))?",
+     r"brilliant|excellent|cool|fantastic|the best)(?: work| job| one)?(?:,? (?:edith|keena|kina|kena|jarvis))?(?:[.!,]* (?:good|great|nice) (?:work|job))?",
      "praise"),
-    (r"(?:well done|good job|good work|nice work|great job|great work)(?:,? (?:keena|kina|kena|jarvis))?(?:[.!,]* (?:well done|good job|good work))?",
+    (r"(?:well done|good job|good work|nice work|great job|great work)(?:,? (?:edith|keena|kina|kena|jarvis))?(?:[.!,]* (?:well done|good job|good work))?",
      "praise"),
-    (r"(?:hi|hello|hey|good (?:morning|afternoon|evening))(?:,? (?:keena|kina|kena|jarvis))?", "greeting"),
-    (r"how are you(?: doing)?(?: today)?(?:,? (?:keena|kina|kena|jarvis))?|how(?:'s| is) it going|what'?s up", "how_are_you"),
+    (r"(?:hi|hello|hey|good (?:morning|afternoon|evening))(?:,? (?:edith|keena|kina|kena|jarvis))?", "greeting"),
+    (r"how are you(?: doing)?(?: today)?(?:,? (?:edith|keena|kina|kena|jarvis))?|how(?:'s| is) it going|what'?s up", "how_are_you"),
     (r"(?:damn,? |wow,? )?(?:you(?:'re| are)?|you'?re just|that was|that'?s|that is|it was) (?:really |so |very |truly |just |simply |pretty |super )*"
      r"(?:amazing|awesome|brilliant|great|the best|smart|incredible|fantastic|genius|a genius|good|helpful|quick|fast|"
-     r"impressive|cool|nice|perfect|insane|crazy good|fire)(?: (?:keena|kina|kena|jarvis))?(?:,? you know)?(?:,? (?:keena|kina|kena|jarvis))?",
+     r"impressive|cool|nice|perfect|insane|crazy good|fire)(?: (?:edith|keena|kina|kena|jarvis))?(?:,? you know)?(?:,? (?:edith|keena|kina|kena|jarvis))?",
      "praise"),
-    (r"(?:so )?what (?:all |else |other things |are (?:all )?(?:the )?(?:other )?things )?(?:can|could) you (?:able to )?(?:do|help (?:me )?with)(?: for me)?(?:,? (?:keena|kina|kena|jarvis))?"
-     r"|what are (?:all )?(?:the )?(?:other )?things (?:that )?you can (?:able to )?do(?:,? (?:keena|kina|kena|jarvis))?|what are your (?:features|capabilities|skills)"
+    (r"(?:so )?what (?:all |else |other things |are (?:all )?(?:the )?(?:other )?things )?(?:can|could) you (?:able to )?(?:do|help (?:me )?with)(?: for me)?(?:,? (?:edith|keena|kina|kena|jarvis))?"
+     r"|what are (?:all )?(?:the )?(?:other )?things (?:that )?you can (?:able to )?do(?:,? (?:edith|keena|kina|kena|jarvis))?|what are your (?:features|capabilities|skills)"
      r"|what do you do",
      "capabilities"),
     (r"who are you|what(?:'s| is) your name|introduce yourself", "who"),
-    (r"are you (?:there|awake|listening|online)(?:,? (?:keena|kina|kena|jarvis))?", "are_you_there"),
+    (r"are you (?:there|awake|listening|online)(?:,? (?:edith|keena|kina|kena|jarvis))?", "are_you_there"),
 ]   # (pattern, kind of line): the words themselves live in brain/persona.py
 
 
@@ -713,8 +713,8 @@ def smalltalk(text):
     t = re.sub(r"\s+", " ", text.strip().lower()).strip(" .!?")
     if not t or len(t.split()) > 12:
         return None
-    t = re.sub(r"^(?:(?:keena|kina|kena|jarvis)[, ]+|ok(?:ay)?[, ]+|wow[, ]+|oh[, ]+)+", "", t)
-    t = re.sub(r"[.!?,]*\s+(?:yes|yeah|man|bro|dude|buddy|sir|(?:keena|kina|kena|jarvis))$", "", t)  # trailing filler
+    t = re.sub(r"^(?:(?:edith|keena|kina|kena|jarvis)[, ]+|ok(?:ay)?[, ]+|wow[, ]+|oh[, ]+)+", "", t)
+    t = re.sub(r"[.!?,]*\s+(?:yes|yeah|man|bro|dude|buddy|sir|(?:edith|keena|kina|kena|jarvis))$", "", t)  # trailing filler
     math = _quick_math(t)
     if math:
         return math

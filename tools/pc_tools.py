@@ -790,7 +790,7 @@ TOOLS = [
     _tool("sleep_pc", "Put the PC to sleep. Asks the user to confirm."),
     _tool("draft_email", "Write an email for him: it is typed into a Gmail compose window so he can see it and ask for "
           "changes. Use this whenever he asks to write, draft, send or change an email; for a change, call it again with "
-          "the whole new version. If he asked to send it, Keena asks him to confirm, then sends it. "
+          "the whole new version. If he asked to send it, Edith asks him to confirm, then sends it. "
           "'to' must be an email address he actually said or one in his profile / what he asked you to remember; "
           "NEVER make one up, leave it empty instead. "
           f"Write a complete, polished email from what he asked, even if his sentence trailed off. Sign off as {USER_NAME}.",

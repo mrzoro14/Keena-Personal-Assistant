@@ -24,7 +24,7 @@ from PySide6.QtWidgets import QApplication, QWidget
 PORT = 47321
 W, H = 420, 560
 CX, CY = W / 2, 200
-CYAN = QColor(255, 77, 166)         # Keena pink (the name CYAN stayed: it is "the accent")
+CYAN = QColor(255, 77, 166)         # Edith pink (the name CYAN stayed: it is "the accent")
 DEEP = QColor(186, 85, 255)         # thinking: violet
 TEXT = QColor(255, 236, 247)
 DIM = QColor(214, 160, 190)
@@ -39,8 +39,8 @@ FONT = "Bahnschrift SemiCondensed"
 try:
     from config import ASSISTANT_NAME
 except Exception:   # the HUD must start even if the settings fail
-    ASSISTANT_NAME = "Keena"
-TITLE = ".".join(ASSISTANT_NAME.upper())   # K.E.E.N.A   # ships with Windows 10/11; Qt falls back quietly if missing
+    ASSISTANT_NAME = "Edith"
+TITLE = ".".join(ASSISTANT_NAME.upper())   # E.D.I.T.H   # ships with Windows 10/11; Qt falls back quietly if missing
 
 
 def rgba(c, a):
@@ -185,12 +185,12 @@ class Hud(QWidget):
         boot = ["SYSTEMS", "VOICE · Ryan", "HEARING · small.en · GPU", "BRAIN · qwen3:8b", "MEMORY · 2 facts · 9 conversations",
                 "MICROPHONE"]
         script = [(0.6, {"state": "boot", "boot": boot[:i]}) for i in range(1, len(boot) + 1)] + [
-            (2.2, {"state": "wake", "reply": "Good evening! Keena online."}),
+            (2.2, {"state": "wake", "reply": "Good evening! Edith online."}),
             (1.0, {"state": "idle"}),
             (1.5, {}),
             (0.8, {"state": "listening"}),
-            (2.6, {"user": "Hey Keena, open Chrome and"}),
-            (0.6, {"user": "Hey Keena, open Chrome and play Anirudh on YouTube"}),
+            (2.6, {"user": "Hey Edith, open Chrome and"}),
+            (0.6, {"user": "Hey Edith, open Chrome and play Anirudh on YouTube"}),
             (0.6, {"state": "thinking"}),
             (1.6, {"card": "Opening Chrome"}),
             (0.4, {"card": "YouTube: Anirudh"}),

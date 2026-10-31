@@ -17,7 +17,7 @@ from brain.brain import Brain
 from brain.persona import line
 from brain.router import screen_mode
 
-STOP_PHRASES = ("goodbye jarvis", "shut down jarvis", "jarvis offline", "goodbye keena", "shut down keena", "keena offline",
+STOP_PHRASES = ("goodbye edith", "shut down edith", "edith offline", "goodbye jarvis", "shut down jarvis", "jarvis offline", "goodbye keena", "shut down keena", "keena offline",
                 "goodbye kina", "kina offline")
 DISMISS_PHRASES = ("that's all", "that is all", "thank you", "thanks", "nothing else", "go to sleep", "never mind")
 YES_WORDS =("yes", "yeah", "yep", "sure", "do it", "go ahead", "confirm")
@@ -418,7 +418,7 @@ def voice_mode():
 
     use_model = config.WAKE_MODE in ("model", "both")
     use_whisper = config.WAKE_MODE in ("whisper", "both")
-    # frames of 80 ms: 0.4 s before, 0.5 s quiet ends it, 12 s max (a one-breath "Keena, mail my CTO... ask how..." is ~8 s)
+    # frames of 80 ms: 0.4 s before, 0.5 s quiet ends it, 12 s max (a one-breath "Edith, mail my CTO... ask how..." is ~8 s)
     PRE_ROLL, END_QUIET, MAX_SEG = 5, 6, 150
 
     while True:
@@ -474,7 +474,7 @@ def voice_mode():
                                 print("\r" + " " * 100 + f"\r[heard \"{config.ASSISTANT_NAME}\"]  ({heard})")
                                 if found:
                                     got_it()  # "Jarvis, open Chrome" in one breath: confirm right away
-                                    # "Keena, naan Maggi pannitu irukken..." in one breath: the command may be Tamil
+                                    # "Edith, naan Maggi pannitu irukken..." in one breath: the command may be Tamil
                                     if language.needs_gemini(found, stt.last_confidence):
                                         english = language.understand(language.wav_bytes(clip))
                                         found = strip_wake(english) if english else found

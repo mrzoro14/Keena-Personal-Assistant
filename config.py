@@ -13,7 +13,7 @@ CONTEXT_TOKENS = int(os.getenv("CONTEXT_TOKENS", "4096"))  # smaller = less VRAM
 # 16 GB PC at 98% full). Off = weights read once onto the GPU. Measured in the commit that added this.
 USE_MMAP = os.getenv("USE_MMAP", "0") == "1"
 USER_NAME = os.getenv("JARVIS_USER", "friend")   # your name: she calls you by it
-ASSISTANT_NAME = os.getenv("ASSISTANT_NAME", "Keena")   # her name: spoken, shown, and the wake word (voice/stt.py)
+ASSISTANT_NAME = os.getenv("ASSISTANT_NAME", "Edith")   # her name: spoken, shown, and the wake word (voice/stt.py)
 OFFER_REMINDERS = os.getenv("OFFER_REMINDERS", "1") != "0"   # plans with times -> "Shall I remind you?" (set only on yes)
 LOG_CONVERSATIONS =os.getenv("LOG_CONVERSATIONS", "1") != "0"   # every turn saved locally in data/jarvis.db
 
@@ -25,7 +25,7 @@ WAKE_THRESHOLD = float(os.getenv("WAKE_THRESHOLD", "0.35"))
 #   model   = openWakeWord "hey jarvis" model only (light, but weak with Indian accents)
 #   whisper = Whisper listens for the word "Jarvis" in anything you say (accent-proof, more CPU)
 #   both    = either one wakes it (default)
-# openWakeWord only knows "hey jarvis", so since the rename to Keena it is Whisper by default
+# openWakeWord only knows "hey jarvis", so since the rename to Edith it is Whisper by default
 WAKE_MODE = os.getenv("WAKE_MODE", "whisper").strip().lower()
 FOLLOW_UP_SECONDS = float(os.getenv("FOLLOW_UP_SECONDS", "6"))  # keep listening after a reply, no wake word needed
 SILENCE_RMS = int(os.getenv("SILENCE_RMS", "500"))
@@ -38,7 +38,7 @@ WAIT_FOR_SPEECH_SECONDS = 5  # give up if you say nothing after the wake word
 # Speech
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small.en")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
-VOICE = os.getenv("JARVIS_VOICE", "en-US-AvaNeural")   # Keena: warm, natural (he picked it from 13 samples)
+VOICE = os.getenv("JARVIS_VOICE", "en-US-AvaNeural")   # Edith: warm, natural (he picked it from 13 samples)
 VOICE_RATE = os.getenv("VOICE_RATE", "+0%")   # Ryan ran at +8%; Ava sounds best at her own pace
 # Tamil / Tanglish understanding (voice/language.py): when Whisper is unsure, Gemini turns his speech into English
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()

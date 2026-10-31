@@ -142,7 +142,7 @@ DICTATION_IDLE = 20   # seconds of silence that end dictation
 DICTATION_KEYS = {"new line": ["enter"], "next line": ["enter"], "new paragraph": ["enter", "enter"],
                   "backspace": ["backspace"], "tab": ["tab"],
                   "undo": ["ctrl+z"], "undo that": ["ctrl+z"], "scratch that": ["ctrl+z"], "delete that": ["ctrl+z"]}
-_DICTATION_FILLER = re.compile(r"^(?:\W*(?:and|okay|ok|so|please|jarvis|keena|kina|kena|now|hey|oh|um|uh|right)\b)+\W*", re.I)
+_DICTATION_FILLER = re.compile(r"^(?:\W*(?:and|okay|ok|so|please|jarvis|edith|keena|kina|kena|now|hey|oh|um|uh|right)\b)+\W*", re.I)
 # "Okay, stop it." / "Stop writing." / "please stop writing." were all TYPED into his Notepad (voice log):
 # a short sentence with a stop word ends dictation; "stop writing/typing" anywhere does too
 _DICTATION_STOP = re.compile(r"\b(?:stop|enough|done|finish(?:ed)?|exit|quit|end|cancel|that'?s all|i'?m done)\b", re.I)
@@ -786,7 +786,7 @@ class Brain:
         return None
 
     def _send_draft(self, confirm):
-        """Send the mail Keena typed into Gmail: ONLY after he says yes to "Send it to ...?"."""
+        """Send the mail Edith typed into Gmail: ONLY after he says yes to "Send it to ...?"."""
         from tools import browser
         if not browser.gmail_open():
             return f"There's no draft open in Gmail to send, {USER_NAME}."
@@ -881,7 +881,7 @@ class Brain:
                 continue
             if name == "draft_email" and BROWSER_CONTROL:
                 # "drafting a mail: no need to open Notepad, directly open Gmail" (his ask): typed into ONE Gmail
-                # compose window Keena tracks; a revision rewrites that window; it's sent only on his yes
+                # compose window Edith tracks; a revision rewrites that window; it's sent only on his yes
                 if on_tool:
                     on_tool(name, args)
                 from tools import browser
