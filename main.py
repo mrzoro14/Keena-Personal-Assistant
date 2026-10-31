@@ -128,6 +128,8 @@ def voice_mode():
     docsearch.start_helper()   # reads his documents at low priority, so "which file has my P number" works
     from tools import notify
     notify.start()   # low-battery alert to his phone (ntfy)
+    from tools import diary
+    diary.start()   # notes which app is in front every 30 s, for "what did I work on yesterday"
 
     print("Loading models (first run downloads them, give it a minute)...")
     hud = Hud(config.HUD, config.HUD_POSITION, config.HUD_SCALE)   # the on-screen HUD (separate process)

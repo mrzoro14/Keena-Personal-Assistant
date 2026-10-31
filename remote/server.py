@@ -33,6 +33,12 @@ except Exception:
 KEY_FILE = os.path.join(ROOT, "data", "remote_key.txt")
 PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "page.html")
 TAILSCALE = ipaddress.ip_network("100.64.0.0/10")
+MAX_FAILS = 10       # wrong keys from one address in FAIL_WINDOW seconds -> that address is shut out for a while
+FAIL_WINDOW = 15 * 60
+# the page only loads its own files: an injected script or a hostile site framing it gets nothing
+CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; "
+       "img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; "
+       "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 ANSWER_WAIT = 90     # seconds he has to tap Yes / No
 TURN_WAIT = 120      # longest a phone request waits for a reply
 
@@ -136,6 +142,7 @@ class Remote:
         self.turns = {}
         self.audio = {}   # id -> (time, mp3): Jarvis's spoken replies, fetched by the phone once
         self.key = key()
+        self.fails = {}   # ip -> times of wrong keys
         self.server = None
 
     # ------------------------------------------------------------------ voice
@@ -248,6 +255,18 @@ class Remote:
             return False
         return a.is_loopback or (a.version == 4 and (a in TAILSCALE or (self.lan and a.is_private)))
 
+    def locked_out(self, ip, failed=False):
+        """Too many wrong keys from this address lately (failed=True records one more). Not this PC itself: the
+        phone's Tailscale https link arrives as 127.0.0.1, and an old paired phone mustn't lock out the new one."""
+        if ip.startswith("127.") or ip == "::1":
+            return False
+        now = time.time()
+        recent = [t for t in self.fails.get(ip, []) if now - t < FAIL_WINDOW] + ([now] if failed else [])
+        self.fails[ip] = recent
+        if failed and len(recent) == MAX_FAILS:
+            print(f"   [phone remote: {ip} shut out for {FAIL_WINDOW // 60} min after {MAX_FAILS} wrong keys]")
+        return len(recent) >= MAX_FAILS
+
     def start(self):
         remote = self
 
@@ -266,6 +285,8 @@ class Remote:
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Security-Policy", CSP)
+                self.send_header("X-Frame-Options", "DENY")
                 self.end_headers()
                 self.wfile.write(data)
 
@@ -273,11 +294,15 @@ class Remote:
                 if not remote.allowed(self.client_address[0]):
                     self._send(403, {"error": "not allowed from this network"})
                     return False
+                if remote.locked_out(self.client_address[0]):
+                    self._send(429, {"error": "too many wrong keys: try again later"})
+                    return False
                 return True
 
             def _ok_key(self):
                 given = self.headers.get("X-Jarvis-Key", "")
                 if not hmac.compare_digest(given.encode(), remote.key.encode()):
+                    remote.locked_out(self.client_address[0], failed=True)
                     time.sleep(0.5)   # slow down guessing
                     self._send(401, {"error": "wrong key: pair again with python -m remote.pair"})
                     return False

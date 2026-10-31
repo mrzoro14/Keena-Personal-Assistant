@@ -763,6 +763,9 @@ FUNCTIONS.update(edge.FUNCTIONS)
 FUNCTIONS.update(docsearch.FUNCTIONS)
 FUNCTIONS.update(whatsapp.FUNCTIONS)
 FUNCTIONS.update(notify.FUNCTIONS)
+from tools import diary, gcal, gmail, spotify  # noqa: E402  PC diary; calendar; reading Gmail; Spotify
+for _mod in (diary, gcal, gmail, spotify):
+    FUNCTIONS.update(_mod.FUNCTIONS)
 
 
 def run_tool(name, args, confirm):
@@ -827,3 +830,4 @@ TOOLS = [
           {"name": {"type": "string"}}, ["name"]),
 ]
 TOOLS += extras.TOOLS + files.TOOLS + edge.TOOLS + docsearch.TOOLS + whatsapp.TOOLS + notify.TOOLS
+TOOLS += diary.TOOLS + gcal.TOOLS + gmail.TOOLS + spotify.TOOLS

@@ -1,6 +1,6 @@
 """The morning briefing: the first time she starts each day (his login), a short spoken rundown.
 
-Greeting, weather where he is, today's reminders, battery if it needs him, and new WhatsApp messages if WhatsApp is
+Greeting, weather where he is, today's reminders and calendar, battery if it needs him, and new WhatsApp messages if WhatsApp is
 open. Later starts the same day (a restart, a crash) just say hello, so it's never repeated. Each part gets a few
 seconds at most: a slow website never holds up "Hey Edith".
 """
@@ -34,6 +34,11 @@ def _first_start_today():
 def _weather():
     from tools.extras import get_weather
     return get_weather(quiet=True)
+
+
+def _calendar():
+    from tools.gcal import today_line
+    return today_line()
 
 
 def _whatsapp():
@@ -72,10 +77,12 @@ def briefing(reminders=()):
         except Exception as e:
             print(f"   [briefing {key}: {e!r}]")
 
-    threads = [threading.Thread(target=run, args=(k, f), daemon=True) for k, f in (("weather", _weather), ("whatsapp", _whatsapp))]
+    threads = [threading.Thread(target=run, args=(k, f), daemon=True)
+               for k, f in (("weather", _weather), ("calendar", _calendar), ("whatsapp", _whatsapp))]
     for t in threads:
         t.start()
     for t in threads:
         t.join(WAIT)
-    parts = [startup_greeting(reminders), got.get("weather", ""), _battery(), got.get("whatsapp", "")]
+    parts = [startup_greeting(reminders), got.get("weather", ""), got.get("calendar", ""), _battery(),
+             got.get("whatsapp", "")]
     return " ".join(p for p in parts if p)

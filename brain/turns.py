@@ -22,7 +22,12 @@ ORDER = re.compile(CLAUSE + rf"(?:{VERBS})\b(?!\s+(?:me know|me think|it go|it b
 # Things only the tools can deal with, wherever they appear
 TOOL_WORDS = re.compile(r"\b(?:remind(?:er|ers)?|timer|alarm|weather|forecast|screenshot|volume|youtube|spotify|"
                         r"clipboard|wikipedia|notepad|chrome|browser|my notes|e-?mail|gmail|folder|downloads|"
-                        r"calculator|wi-?fi|bluetooth|brightness|routine|work mode|focus mode)\b")
+                        r"calculator|wi-?fi|bluetooth|brightness|routine|work mode|focus mode|"
+                        # his mail, calendar and PC diary: the chat side can't see them and made answers up
+                        # ("nobody emailed you", "you worked on the project yesterday")
+                        r"e-?mail(?:ed|s)?|mails?|inbox|calendar|schedule|agenda|appointments?|diary|"
+                        r"(?:anything|something|what(?:'s| is)?) (?:planned|on)|plans for|(?:free|busy) (?:on|this|tomorrow|today)|"
+                        r"(?:on|at|using) (?:the|my) (?:pc|laptop|computer))\b")
 
 # Saving facts about him needs the remember tool, and only when he asks ("remember that...")
 REMEMBER = re.compile(r"\b(?:remember (?:that|this)|don'?t forget|note (?:that|down)|save (?:that|this)|"

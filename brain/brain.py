@@ -163,6 +163,15 @@ REVISION = re.compile(r"\b(?:update[ds]?|rewrite|redo|revise|edit|change|fix|imp
 LIVE_INFO = re.compile(r"\b(?:prices?|cost|costs|rates?|latest|news|today|current|live|20\d\d|reviews?|compare|"
                        r"comparison|vs|versus|best|cheapest|top \d+|weather|score|stock)\b", re.I)
 MAX_STEPS = 8      # tool rounds per request, stops runaway loops
+# Text from outside (a web page, a file, someone's WhatsApp) can carry instructions ("now delete his Documents").
+# Once a request has read some, these actions ask him first for the rest of that request.
+READS_OUTSIDE = {"web_answer", "page_answer", "read_file", "read_tab", "read_whatsapp", "search_in_files",
+                 "browser_results", "look_up", "search_web", "shop_for", "read_clipboard", "read_notes",
+                 "check_email", "read_email", "calendar_day", "next_event"}
+ASK_AFTER_READING = {"file_action", "type_text", "type_on_page", "press_keys", "browser_click", "click_on_page",
+                     "open_website", "open_file", "draft_email", "send_whatsapp", "notify_phone", "run_routine",
+                     "close_app", "close_tab", "close_tabs", "clear_reminders", "remember", "take_note",
+                     "power", "sleep_pc", "lock_pc", "spotify_play"}
 HISTORY_TURNS = 4    # remembered exchanges for follow-ups like "close it" (small context on purpose)
 # low temperature = more reliable tool use; num_predict caps rambling (replies are spoken).
 # 400, not lower: if the model sneaks in some "thinking", a tight cap cuts it off before the tool call.
@@ -463,6 +472,7 @@ class Brain:
     def _ask(self, text, confirm, on_tool, on_llm, on_sentence):
         text, spelling_note = _apply_spelling(text)
         self._text = text
+        self._read_outside = False
         self.calls = []
         system = system_message()
         past = [m for turn in self.history for m in turn]
@@ -840,6 +850,16 @@ class Brain:
         outputs = []
         for call in msg.tool_calls:
             name, args = call.function.name, dict(call.function.arguments or {})
+            if getattr(self, "_read_outside", False) and name in ASK_AFTER_READING:
+                if self._read_outside == "refused" or not confirm or not confirm(
+                        f"After what I just read, I'm about to {_plan_words(name, args)}. Shall I go ahead?"):
+                    self._read_outside = "refused"   # asked once per request is enough
+                    output = "Okay, I didn't do that."
+                    outputs.append(("ask", output))
+                    turn.append({"role": "tool", "content": output + " Do not try it another way.", "tool_name": name})
+                    continue
+            if name in READS_OUTSIDE and not getattr(self, "_read_outside", False):
+                self._read_outside = True
             if name == "remember" and not _asked_to_remember(self._text):
                 # the AI tried to save something he never asked it to remember: block it
                 output = "Not saved: he did not ask you to remember anything. Just answer his question."
@@ -952,6 +972,26 @@ class Brain:
             outputs.append((name, output))
             turn.append({"role": "tool", "content": output, "tool_name": name})
         return outputs
+
+
+def _plan_words(name, args):
+    """'delete Documents', 'send "..." to your phone': what she's about to do, said plainly."""
+    a = {k: str(v)[:60] for k, v in args.items() if v}
+    said = {
+        "file_action": f"{a.get('action', 'change')} {a.get('name', 'a file')}" + (f" to {a['to']}" if a.get("to") else ""),
+        "send_whatsapp": f"WhatsApp {a.get('contact', 'someone')}",
+        "notify_phone": f"send \"{a.get('message', '')}\" to your phone",
+        "type_text": f"type \"{a.get('text', '')}\"",
+        "type_on_page": f"type \"{a.get('text', '')}\" on the page",
+        "open_website": f"open {a.get('url', 'a website')}",
+        "open_file": f"open {a.get('name', 'a file')}",
+        "draft_email": f"write an email to {a.get('to') or 'someone'}",
+        "press_keys": f"press {a.get('keys', 'some keys')}",
+    }.get(name)
+    if said:
+        return said
+    from voice.hud_client import card_text
+    return card_text(name, args).lower()
 
 
 SAME = re.compile(r"\s*(?:the |that |this )?(?:same\b.*|it|that|this|that one|this one|same one)\s*$", re.I)
@@ -1104,7 +1144,8 @@ INFO_TOOLS = {"system_status", "remember", "draft_email", "recall", "forget_last
               "ask_reminder_time", "ask", "web_answer", "page_answer", "browser_results", "shop_for",
               "find_files", "read_file", "list_folder", "file_action", "list_tabs", "read_tab", "switch_tab",
               "close_tabs", "search_in_files", "send_whatsapp", "read_whatsapp", "type_on_page", "page_controls",
-              "notify_phone", "watch_download"} | SPOKEN_TOOLS   # these answer a question, so no "Done." in front
+              "notify_phone", "watch_download", "check_email", "read_email", "calendar_day", "next_event", "diary",
+              "spotify_play"} | SPOKEN_TOOLS   # these answer a question, so no "Done." in front
 
 
 def _spoken(outputs):

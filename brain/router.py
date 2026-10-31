@@ -195,6 +195,73 @@ def _route_whatsapp(t):
     return None
 
 
+MAIL = r"(?:e-?mails?|mails?|gmail|inbox)"
+DAY = r"(?P<day>today|tonight|tomorrow|(?:on |this |next )?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|" \
+      r"(?:this |the |next )?weekend|(?:this|next) week)"
+WHEN = r"(?P<when>today|yesterday|the day before yesterday|this morning|this week|last week|this month|" \
+       r"(?:on |last )?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))"
+MUSIC_APP = __import__("os").getenv("MUSIC_APP", "youtube").strip().lower()
+
+
+def _route_life(t):
+    """Gmail (tools/gmail.py), calendar (tools/gcal.py), Spotify (tools/spotify.py) and the PC diary
+    (tools/diary.py). Reading only: writing mail is draft_email, which asks before sending."""
+    # Gmail: one email read out, or the list of new ones
+    if m := _m(rf"(?:read|open|show)(?: me)?(?: the| my)? (?:latest |last |newest |new |recent )?{MAIL} (?:from|by) (.+)", t) or \
+            _m(rf"what did (.+?) (?:e-?mail|mail|send) me(?: about)?", t):
+        return [("read_email", {"sender": m[1]})]
+    if m := _m(rf"(?:read|open|show)(?: me)?(?: the| my)? {MAIL} (?:about|regarding|on) (.+)", t):
+        return [("read_email", {"about": m[1]})]
+    if m := _m(r"(?:did|has) (.+?) (?:send|sent|e-?mail(?:ed)?|mail(?:ed)?) me(?: an?)?(?: e-?mail| mail)?"
+               r"(?: (?:about|regarding) (.+?))?", t):
+        if re.search(r"\b(?:e-?mail|mail)", t):   # "did Arjun send me a message" may be WhatsApp: the AI decides
+            return [("read_email", {"sender": m[1], **({"about": m[2]} if m[2] else {})})]
+    if _m(rf"(?:read|open|show)(?: me)?(?: the| my) (?:latest|last|newest|most recent|recent) (?:e-?mail|mail)", t):
+        return [("read_email", {})]
+    if _m(rf"(?:check|read|show)(?: me)?(?: my)?(?: new| unread| latest)? {MAIL}", t) or \
+            _m(rf"(?:do i have |have i got |are there |any )(?:any )?(?:new |unread |important )?(?:e-?mails?|mails?)"
+               rf"(?: in my inbox| on gmail)?", t) or \
+            _m(rf"(?:what(?:'s| is)|anything) (?:new |important )?in my {MAIL}", t):
+        return [("check_email", {})]
+    # Calendar
+    if _m(r"(?:what(?:'s| is)|when(?:'s| is)) (?:my )?next (?:meeting|event|appointment|thing)(?: on my calendar)?|"
+          r"what(?:'s| is) next on my (?:calendar|schedule)", t):
+        return [("next_event", {})]
+    if m := _any(t, rf"what(?:'s| is| do i have)(?: on)?(?: my (?:calendar|schedule|agenda))?(?: for)? {DAY}",
+                 rf"(?:am i|are we) (?:free|busy) {DAY}",
+                 rf"(?:do i have )?(?:anything|something) (?:planned|on)(?: for| on)? {DAY}",
+                 rf"what(?:'s| are) my plans(?: for)? {DAY}",
+                 rf"(?:do i have )?(?:any )?(?:meetings|events|plans|appointments)(?: on| for)? {DAY}",
+                 rf"what(?:'s| is) my (?:schedule|agenda|calendar)(?: (?:for|like))? {DAY}"):
+        return [("calendar_day", {"day": m["day"]})]
+    if _m(r"(?:check|read|show)(?: me)? my (?:calendar|schedule|agenda)|what(?:'s| is) (?:on )?my (?:calendar|schedule|agenda)", t):
+        return [("calendar_day", {"day": "today"})]
+    # Spotify
+    if _m(r"play(?: me)?(?: my)? (?:liked|favou?rite|saved|loved) (?:songs?|tracks?|music)(?: on spotify)?|"
+          r"play (?:some )?(?:music |songs )?on spotify|(?:play|open) spotify(?: and play(?: something| music)?)?", t):
+        return [("spotify_play", {"what": "liked songs"})]
+    if m := _m(r"play (?:me )?(?:my )?(.+?) (?:playlist )?(?:on|in|from) spotify", t) or _m(r"play my (.+?) playlist", t):
+        return [("spotify_play", {"what": m[1]})]
+    # The diary: what he did on the PC
+    if m := _m(rf"how (?:long|much time) (?:was i|have i been|did i spend|have i spent)(?: on)? (.+?)(?: {WHEN})?", t) or \
+            _m(rf"how (?:long|much time) (?:was i |have i been |did i spend |have i spent )?(?:on|in|using|watching) (.+?)(?: {WHEN})?", t):
+        return [("diary", {"about": re.sub(r"^(?:on|in|using|watching) ", "", m[1]), "when": m["when"] or "today"})]
+    if m := _any(t, rf"what (?:did i|have i) (?:do|done|work(?:ed)? on|been doing|been working on|get done|"
+                    rf"spend (?:my )?time on)(?: on (?:the|my) (?:pc|laptop|computer))? {WHEN}",
+                 rf"(?:show|read|tell)(?: me)? my diary(?: for)?(?: {WHEN})?",
+                 rf"what(?:'s| is) in my diary(?: for)?(?: {WHEN})?"):
+        return [("diary", {"when": m["when"] or "today"})]
+    return None
+
+
+def _any(t, *patterns):
+    """The first of several patterns that matches (each may use the same named groups)."""
+    for p in patterns:
+        if m := _m(p, t):
+            return m
+    return None
+
+
 def _route_extras(text):
     """Reminders, timers, notes, weather, folders, clipboard, power. Works on the original text."""
     t = re.sub(r"\s+", " ", text.strip()).rstrip(" .!?")
@@ -505,7 +572,8 @@ def _route_text(text):
 
 # text he dictates keeps his original capitals ("type Hello World", "tell Arjun I'm in London"), not lowercase
 OWN_WORDS = {"type_text": ("text",), "type_on_page": ("text",), "send_whatsapp": ("contact", "message"),
-             "notify_phone": ("message",)}
+             "notify_phone": ("message",), "read_email": ("sender", "about"), "diary": ("about",),
+             "spotify_play": ("what",)}
 
 
 def _own_words(steps, text):
@@ -575,7 +643,7 @@ def _route_one(t):
     # Files anywhere and every Edge tab (tools/files.py, tools/edge.py): before the browser and close rules, so
     # "close all the YouTube tabs" isn't close_app, and "summarise the second one" reads the file instead of the
     # model making up a summary
-    if steps := _route_files_tabs(t) or _route_whatsapp(t):
+    if steps := _route_files_tabs(t) or _route_whatsapp(t) or _route_life(t):
         return steps
     # Driving the browser page he's on (Jarvis's own Chrome window): before media/YouTube, so "play the second video"
     # picks a result instead of searching YouTube for "the second video"
@@ -600,7 +668,8 @@ def _route_one(t):
     # "play believer" / "play anirudh hukum": a title, so YouTube (bare "play" / "play the music" = media key, above;
     # games and apps go through "open X")
     if (m := _m(r"play (?!(?:the |a |some )?(?:game|it|that|this|again|next|previous)\b)(.+)", t)) and len(m[1].split()) <= 8:
-        return [("play_on_youtube", {"query": m[1]})]
+        # MUSIC_APP=spotify in .env: a bare "play believer" goes to Spotify ("... on youtube" still goes to YouTube)
+        return [("spotify_play", {"what": m[1]})] if MUSIC_APP == "spotify" else [("play_on_youtube", {"query": m[1]})]
 
     # Web search. Answering is the default ("it can't search the web and answer, it just opens Chrome");
     # the browser only when he names it: "search google for ...", "... on google", "... in chrome", "show me results"

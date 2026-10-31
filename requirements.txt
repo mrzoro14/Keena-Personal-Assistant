@@ -18,3 +18,5 @@ cryptography  # Jarvis Remote https certificate (the phone mic needs a secure pa
 uiautomation  # every Edge tab: list, switch, close, read (tools/edge.py)
 pypdf  # read PDFs out loud (tools/files.py)
 send2trash  # deletes go to the Recycle Bin, never permanent
+icalendar  # Google Calendar by voice (tools/gcal.py)
+recurring-ical-events  # repeating calendar events
