@@ -15,3 +15,6 @@ PySide6
 playwright
 qrcode  # python -m remote.pair (optional: prints the pairing QR code)
 cryptography  # Jarvis Remote https certificate (the phone mic needs a secure page)
+uiautomation  # every Edge tab: list, switch, close, read (tools/edge.py)
+pypdf  # read PDFs out loud (tools/files.py)
+send2trash  # deletes go to the Recycle Bin, never permanent

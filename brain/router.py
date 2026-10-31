@@ -99,6 +99,36 @@ def _route_file(t):
     return [("open_file", args)]
 
 
+NTH = r"(first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th)"
+THIS_TAB = r"(?:this|that|the current|current|my current)"
+
+
+def _route_files_tabs(t):
+    if _m(r"(?:which|what) tabs (?:do i have |have i got |are )?open(?:ed)?(?: in edge| on edge| in my browser)?|"
+          r"(?:list|show me|tell me|read out)(?: all)? (?:my |the )?(?:open )?(?:edge )?tabs(?: in edge)?|"
+          r"how many tabs (?:do i have |are )?open(?: in edge)?", t):
+        return [("list_tabs", {})]
+    if m := _m(r"close (?:all|every)(?: of)?(?: the| my)? (.+?) tabs", t):
+        return [("close_tabs", {"name": m[1], "every": True})]
+    if m := _m(r"(?:switch|go|jump|move) (?:back )?to (?:the |my )?(.+?) tab", t):
+        return [("switch_tab", {"name": m[1]})]
+    if m := _m(r"(?:what does|what's on|what is on|what's in|what is in|read(?: out)?|summari[sz]e|explain)"
+               rf" (?:me )?(?:the |my )?({THIS_TAB}|.+?) tab(?: say| about| saying)?", t):
+        return [("read_tab", {"name": "" if re.fullmatch(THIS_TAB, m[1]) else m[1], "question": t})]
+    from tools import files
+    if files.last and (m := _m(r"(?:summari[sz]e|read(?: out)?|what(?:'s| is) in|what does|open and read|tell me what's "
+                                rf"in) (?:the )?{NTH} (?:one|file|result|document)(?: say)?", t)):
+        return [("read_file", {"name": m[1], "question": t})]   # only after a FILE search, not web results
+    if m := _m(r"(?:summari[sz]e|read(?: out)?|what(?:'s| is) in|what does) (?:my |the )?(?:(.+?) )?"
+               r"(file|pdf|document|doc|resume|cv|notes|report)(?: say)?", t):
+        name = m[1] if m[2] in ("file", "document", "doc") else f"{m[1] or ''} {m[2]}".strip()
+        if name:
+            return [("read_file", {"name": name, "question": t})]
+    if m := _m(r"rename (?:the |my )?(.+?) (?:to|as) (.+)", t):
+        return [("file_action", {"action": "rename", "name": m[1], "to": m[2]})]
+    return None
+
+
 def _route_extras(text):
     """Reminders, timers, notes, weather, folders, clipboard, power. Works on the original text."""
     t = re.sub(r"\s+", " ", text.strip()).rstrip(" .!?")
@@ -461,6 +491,11 @@ def _route_one(t):
         keys = [KEY_NAMES.get(k, k) for k in re.split(r"\s*(?:\+|plus|and|then)\s*|\s+", m[1].strip()) if k]
         if keys and all(k in KNOWN_KEYS for k in keys):
             return [("press_keys", {"keys": keys})]
+    # Files anywhere and every Edge tab (tools/files.py, tools/edge.py): before the browser and close rules, so
+    # "close all the YouTube tabs" isn't close_app, and "summarise the second one" reads the file instead of the
+    # model making up a summary
+    if steps := _route_files_tabs(t):
+        return steps
     # Driving the browser page he's on (Jarvis's own Chrome window): before media/YouTube, so "play the second video"
     # picks a result instead of searching YouTube for "the second video"
     if steps := _route_browser(t):

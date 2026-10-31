@@ -406,6 +406,15 @@ def close_tab(site=None, **_):
                 print(f"   [browser close_tab: {e!r}]")
     wins = _browser_windows(name or None)
     said = {"youtube": "YouTube", "linkedin": "LinkedIn", "whatsapp": "WhatsApp"}.get(name.lower(), name.title())
+    if not wins and name:   # a background tab: Edge tabs can be closed without bringing them forward
+        from tools import edge
+        try:
+            with edge._uia():
+                found = edge.match(name)
+            if found:
+                return edge.close_tabs(name)
+        except Exception as e:
+            print(f"   [edge close_tabs: {e!r}]")
     if not wins:
         return (f"I don't see a {said} tab in front in any browser window. It may be in a background tab."
                 if name else "I don't see a browser window open.")
@@ -725,7 +734,10 @@ FUNCTIONS = {
 }
 
 from tools import extras  # noqa: E402  reminders, notes, weather, folders, clipboard, power
+from tools import edge, files  # noqa: E402  files on every drive; every Edge tab
 FUNCTIONS.update(extras.FUNCTIONS)
+FUNCTIONS.update(files.FUNCTIONS)
+FUNCTIONS.update(edge.FUNCTIONS)
 
 
 def run_tool(name, args, confirm):
@@ -789,4 +801,4 @@ TOOLS = [
     _tool("run_routine", f"Run a saved routine. Available: {', '.join(ROUTINES)}.",
           {"name": {"type": "string"}}, ["name"]),
 ]
-TOOLS += extras.TOOLS
+TOOLS += extras.TOOLS + files.TOOLS + edge.TOOLS

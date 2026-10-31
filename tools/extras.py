@@ -372,6 +372,10 @@ def find_file(name, folder=None):
 def open_file(name, folder=None, app=None, **_):
     """Open or play a file from your folders, with its default app or VLC."""
     path = find_file(name, folder)
+    if not path and not folder:   # anywhere on the PC, or "the first one" from the last search
+        from tools import files
+        path = files._resolve(name)
+        path = path if path and os.path.isfile(path) else None
     where = f" in your {folder} folder" if folder else ""
     if not path:
         return f"Sorry, I couldn't find a file called {_spoken_filename(name)}{where}."
