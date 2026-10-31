@@ -1,7 +1,7 @@
 """Files anywhere on the PC: find, read, list, move, copy, rename, delete, new folder.
 
-Search uses the Windows Search index (every indexed drive, fast), then a quick scan of the drives if the index has
-nothing. Changes don't ask first (he chose that), with two safety nets: delete goes to the Recycle Bin (never
+Search uses her own map of every file on C: and D: (rebuilt in the background), then the Windows Search index, then
+a quick scan of any other drive. Changes don't ask first (he chose that), with two safety nets: delete goes to the Recycle Bin (never
 permanent), and Windows / Program Files / Jarvis's own keys are never touched. File text goes to the local brain only.
 """
 import os
@@ -9,6 +9,8 @@ import re
 import shutil
 import threading
 import time
+from array import array
+from bisect import bisect_right
 
 from tools.extras import _find_folder, _spoken_filename, _squash, FOLDERS, ROOT
 
@@ -27,10 +29,22 @@ TEXT_EXT = {".txt", ".md", ".csv", ".json", ".py", ".js", ".ts", ".tsx", ".jsx",
 KINDS = {"pdf": (".pdf",), "word": (".docx", ".doc"), "excel": (".xlsx", ".xls", ".csv"), "powerpoint": (".pptx", ".ppt"),
          "image": (".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"), "video": (".mp4", ".mkv", ".avi", ".mov", ".webm"),
          "music": (".mp3", ".wav", ".flac", ".m4a"), "code": (".py", ".js", ".ts", ".java", ".cpp", ".cs", ".html")}
-SEARCH_SECONDS = 6   # the fallback scan gives up after this: a slow answer is worse than "couldn't find it"
+CODE_EXT = (TEXT_EXT - {".txt", ".md", ".csv", ".html"}) | {".map", ".br", ".gz", ".dll", ".pyc", ".pyd", ".h", ".hpp",
+                                                            ".lib", ".obj", ".class", ".jar", ".mjs", ".cjs", ".scss",
+                                                            ".php", ".pm", ".pod", ".pl", ".rb", ".lua", ".mo", ".po"}
+# his own places rank first in search; apps, games and tools installed there come after
+MINE = tuple(os.path.normcase(os.path.join(HOME, f)) for f in
+             ("Desktop", "Documents", "Downloads", "Pictures", "Videos", "Music", "OneDrive")) + ("d:\\",)
+NOT_MINE = ("\\steamlibrary\\", "\\games\\", "\\xampp\\", "\\pinokio\\", "\\anaconda", "\\miniconda", "\\android\\sdk")
+SEARCH_SECONDS = 6  # the fallback scan gives up after this: a slow answer is worse than "couldn't find it"
+# every file and folder name on C: and D:, walked in the background (about 4s) so search sees all of them instantly
+MAP_DRIVES = [d for d in DRIVES if d[0] in "CD"]
+MAP_EVERY = 600   # seconds between rebuilds; a change she makes herself rebuilds it sooner
 
 last = []   # paths from the last search: "open the second one", "delete the first one"
 _index_lock = threading.Lock()
+_map = None   # (folder paths, file names, folder index of each file) once the first walk is done
+_map_dirty = threading.Event()
 
 
 def _protected(path):
@@ -65,10 +79,85 @@ def _index_search(words, ext=(), limit=40):
         return []
 
 
+def _packed(keys):
+    """One newline-joined string of squashed names + where each starts: str.find over it is ~100x faster than a loop."""
+    starts, at = array("I"), 0
+    for k in keys:
+        starts.append(at)
+        at += len(k) + 1
+    return "\n".join(keys), starts
+
+
+def _build_map():
+    dirs, names, where = [], [], array("I")
+    for root in MAP_DRIVES:
+        for dirpath, dirnames, files in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d.lower() not in SKIP and not d.startswith(".")]
+            where.extend([len(dirs)] * len(files))
+            dirs.append(dirpath)
+            names.extend(files)
+    file_keys = _packed([_squash(os.path.splitext(n)[0]) for n in names])
+    dir_keys = _packed([_squash(os.path.basename(d.rstrip("\\"))) for d in dirs])
+    return dirs, names, where, file_keys, dir_keys
+
+
+def _hits(packed, key):
+    """Indexes of every packed name containing `key`."""
+    text, starts = packed
+    out, pos = [], text.find(key)
+    while pos != -1:
+        i = bisect_right(starts, pos) - 1
+        out.append(i)
+        nxt = text.find("\n", pos)
+        if nxt == -1:
+            break
+        pos = text.find(key, nxt + 1)
+    return out
+
+
+def _rank(path):
+    """0 for his own files in his own folders, 1 for other files (inside apps and games), 2 for code and program parts."""
+    if os.path.splitext(path)[1].lower() in CODE_EXT:
+        return 2
+    p = os.path.normcase(path)
+    return 0 if p.startswith(MINE) and not any(x in p for x in NOT_MINE) else 1
+
+
+def _map_loop():
+    global _map
+    while True:
+        try:
+            t = time.perf_counter()
+            _map = _build_map()
+            print(f"   [file map: {len(_map[1])} files, {len(_map[0])} folders in {time.perf_counter() - t:.1f}s]")
+        except Exception as e:
+            print(f"   [file map: {e!r}]")
+        _map_dirty.wait(MAP_EVERY)
+        _map_dirty.clear()
+        time.sleep(2)   # let a burst of moves finish first
+
+
+def _map_search(key, ext=(), folders=False):
+    """Every mapped name that squashes to contain `key`, newest first. None until the first walk is done."""
+    m = _map
+    if m is None:
+        return None
+    dirs, names, where, file_keys, dir_keys = m
+    if folders:
+        found = [dirs[i] for i in _hits(dir_keys, key) if i]   # 0 is a drive itself
+    else:
+        found = [os.path.join(dirs[where[i]], names[i]) for i in _hits(file_keys, key)
+                 if not ext or names[i].lower().endswith(ext)]
+    found = [p for p in sorted(found, key=_rank)[:300] if os.path.exists(p)]
+    return sorted(found, key=lambda p: (_rank(p), -os.path.getmtime(p)))
+
+
 def _scan(key, ext=(), folders=False):
     """Walk the drives (user folders first) for names that squash to contain `key`. Time-limited."""
     t0, found = time.perf_counter(), []
     roots = [HOME] + DRIVES
+    if _map is not None:
+        roots = [d for d in DRIVES if d not in MAP_DRIVES]   # C: and D: are already in the map
     seen = set()
     for root in roots:
         for dirpath, dirnames, files in os.walk(root):
@@ -97,8 +186,10 @@ def find(name, kind=None, folders=False):
     key = _squash(stem)
     if not key:
         return []
-    hits = [] if folders else _index_search(words, ext)
-    hits = [p for p in hits if key in _squash(os.path.splitext(os.path.basename(p))[0])] or hits
+    hits = _map_search(key, ext, folders)
+    if not hits:
+        hits = [] if folders else _index_search(words, ext)
+        hits = [p for p in hits if key in _squash(os.path.splitext(os.path.basename(p))[0])] or hits
     if not hits:
         hits = _scan(key, ext, folders)
     exact = [p for p in hits if _squash(os.path.splitext(os.path.basename(p))[0]) == key]
@@ -230,6 +321,12 @@ def html_unescape(s):
 
 
 def file_action(action, name, to=None, **_):
+    said = _file_action(action, name, to)
+    _map_dirty.set()   # the map shows the change in a few seconds, not ten minutes
+    return said
+
+
+def _file_action(action, name, to=None):
     """move / copy / rename / delete / new_folder. No confirmation (his choice); delete = Recycle Bin."""
     global last
     action = (action or "").lower()
@@ -310,3 +407,5 @@ TOOLS = [
            "name": {"type": "string"}, "to": {"type": "string"}}, ["action", "name"]),
 ]
 FUNCTIONS = {"find_files": find_files, "list_folder": list_folder, "file_action": file_action}
+
+threading.Thread(target=_map_loop, name="file-map", daemon=True).start()
