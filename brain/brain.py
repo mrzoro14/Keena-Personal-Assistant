@@ -1103,7 +1103,8 @@ from tools.extras import NEEDS_FOLLOWUP, SPOKEN_TOOLS  # noqa: E402
 INFO_TOOLS = {"system_status", "remember", "draft_email", "recall", "forget_last", "forget_about",
               "ask_reminder_time", "ask", "web_answer", "page_answer", "browser_results", "shop_for",
               "find_files", "read_file", "list_folder", "file_action", "list_tabs", "read_tab", "switch_tab",
-              "close_tabs"} | SPOKEN_TOOLS   # these answer a question, so no "Done." in front
+              "close_tabs", "search_in_files", "send_whatsapp", "read_whatsapp", "type_on_page", "page_controls",
+              "notify_phone", "watch_download"} | SPOKEN_TOOLS   # these answer a question, so no "Done." in front
 
 
 def _spoken(outputs):

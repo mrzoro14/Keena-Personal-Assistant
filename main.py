@@ -124,6 +124,10 @@ def voice_mode():
     threading.Thread(target=apps.installed, daemon=True).start()  # index installed apps/games in the background
     from voice import language
     threading.Thread(target=language.warm, daemon=True).start()   # Gemini connection ready for his first Tamil sentence
+    from tools import docsearch
+    docsearch.start_helper()   # reads his documents at low priority, so "which file has my P number" works
+    from tools import notify
+    notify.start()   # low-battery alert to his phone (ntfy)
 
     print("Loading models (first run downloads them, give it a minute)...")
     hud = Hud(config.HUD, config.HUD_POSITION, config.HUD_SCALE)   # the on-screen HUD (separate process)
@@ -228,6 +232,7 @@ def voice_mode():
         msgs = due_reminders()
         for msg in msgs:
             print(f"\n[reminder] {msg}")
+            notify.send_later(msg, title="Reminder", tags="alarm_clock", priority=4)   # on his phone too
             chime(990, 0.15)
             chime(990, 0.15)
             say(msg)
@@ -397,9 +402,9 @@ def voice_mode():
     start_remote(remote_run, stt)   # with Whisper + voice: he can TALK to Jarvis on the phone
     mic.start()
     hud.state("wake")
-    from brain.persona import startup_greeting
+    from brain.briefing import briefing
     from tools.extras import today_reminders
-    greeting = startup_greeting(today_reminders())   # "Good evening, sir. Jarvis online. One reminder today: ..."
+    greeting = briefing(today_reminders())   # first start of the day: weather, reminders, battery, WhatsApp; else hello
     print(f"{config.ASSISTANT_NAME}: {greeting}")
     say(greeting)
     hud.state("idle")
@@ -500,6 +505,18 @@ def voice_mode():
         ready()
 
 
+_mutex = None
+
+
+def only_copy():
+    """False if voice mode is already running: two copies both hear 'Hey Edith' and both answer."""
+    global _mutex
+    import ctypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _mutex = kernel32.CreateMutexW(None, False, "Local\\EdithVoiceAssistant")
+    return ctypes.get_last_error() != 183   # ERROR_ALREADY_EXISTS
+
+
 if __name__ == "__main__":
     try:
         if "--text" in sys.argv:
@@ -509,6 +526,9 @@ if __name__ == "__main__":
         elif "--brain-test" in sys.argv:
             Brain().benchmark()
         else:
+            if not only_copy():
+                print(f"{config.ASSISTANT_NAME} is already running.")
+                sys.exit(0)   # 0: run_jarvis.cmd doesn't start it again
             voice_mode()
     except KeyboardInterrupt:
         print(f"\n{config.ASSISTANT_NAME} stopped.")

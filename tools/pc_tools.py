@@ -472,13 +472,35 @@ def browser_results(**_):
     return _browser_do(browser.list_results)
 
 
-def browser_click(target, confirm=None, **_):
+def _use_edge():
+    """His Edge, not Jarvis's Chrome: Edge is in front, or Jarvis's Chrome isn't in front and Edge is open."""
+    import ctypes
+    import psutil
     from tools import browser
+    if browser.is_front():
+        return False
+    pid = ctypes.c_ulong()
+    ctypes.windll.user32.GetWindowThreadProcessId(ctypes.windll.user32.GetForegroundWindow(), ctypes.byref(pid))
+    try:
+        if psutil.Process(pid.value).name().lower() == "msedge.exe":
+            return True
+    except Exception:
+        pass
+    return not browser.is_running() and any((p.info["name"] or "").lower() == "msedge.exe"
+                                            for p in psutil.process_iter(["name"]))
+
+
+def browser_click(target, confirm=None, **_):
+    from tools import browser, edge
+    if _use_edge():
+        return edge.click_on_page(target, confirm=confirm)
     return _browser_do(browser.click, target, confirm)
 
 
 def browser_search(query, **_):
-    from tools import browser
+    from tools import browser, edge
+    if _use_edge():
+        return edge.type_on_page(query, field="search", submit=True)
     return _browser_do(browser.search_here, query)
 
 
@@ -734,10 +756,13 @@ FUNCTIONS = {
 }
 
 from tools import extras  # noqa: E402  reminders, notes, weather, folders, clipboard, power
-from tools import edge, files  # noqa: E402  files on every drive; every Edge tab
+from tools import docsearch, edge, files, notify, whatsapp  # noqa: E402  files; Edge tabs; phone alerts; WhatsApp
 FUNCTIONS.update(extras.FUNCTIONS)
 FUNCTIONS.update(files.FUNCTIONS)
 FUNCTIONS.update(edge.FUNCTIONS)
+FUNCTIONS.update(docsearch.FUNCTIONS)
+FUNCTIONS.update(whatsapp.FUNCTIONS)
+FUNCTIONS.update(notify.FUNCTIONS)
 
 
 def run_tool(name, args, confirm):
@@ -801,4 +826,4 @@ TOOLS = [
     _tool("run_routine", f"Run a saved routine. Available: {', '.join(ROUTINES)}.",
           {"name": {"type": "string"}}, ["name"]),
 ]
-TOOLS += extras.TOOLS + files.TOOLS + edge.TOOLS
+TOOLS += extras.TOOLS + files.TOOLS + edge.TOOLS + docsearch.TOOLS + whatsapp.TOOLS + notify.TOOLS

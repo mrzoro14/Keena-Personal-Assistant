@@ -198,6 +198,180 @@ def read_tab(name=None):
     return {"title": title, "url": url, "site": re.sub(r"^https?://(www\.)?|/.*$", "", url) or "Edge", "text": text}
 
 
+# ------------------------------------------------------------------ the page itself: click and type
+CLICKABLE = {"ButtonControl", "HyperlinkControl", "CheckBoxControl", "RadioButtonControl", "MenuItemControl",
+             "TabItemControl", "ListItemControl", "SplitButtonControl", "ImageControl"}
+TYPEABLE = {"EditControl", "ComboBoxControl"}
+# same name twice (Bing's "Images" is a link AND a list entry): the real link or button wins
+KIND_ORDER = {"HyperlinkControl": 0, "ButtonControl": 0, "SplitButtonControl": 0, "CheckBoxControl": 1,
+              "RadioButtonControl": 1, "TabItemControl": 1, "MenuItemControl": 2, "ListItemControl": 3, "ImageControl": 4}
+# the same safety list as Jarvis's own Chrome: these change something real, so she asks first
+from tools.browser import RISKY  # noqa: E402
+
+
+def front_window():
+    """The Edge window in front, or None."""
+    import ctypes
+    hwnd = ctypes.windll.user32.GetForegroundWindow()
+    return next((w for w in _windows() if w.NativeWindowHandle == hwnd), None)
+
+
+def _page_doc(win):
+    """The page of the tab on show. Edge fills in the page's buttons a moment after it's first looked at."""
+    auto = _auto()
+    docs = []
+    for c, _d in auto.WalkControl(win, maxDepth=16):
+        if c.ControlTypeName == "DocumentControl" and c.Name != "" and not _off(c):
+            docs.append(c)
+    if not docs:
+        doc = win.DocumentControl(searchDepth=16)
+        if not doc.Exists(1, 0):
+            raise EdgeError("I can't see a page in Edge.")
+        docs = [doc]
+    return docs[0]
+
+
+def _off(c):
+    """Off screen? An element the page just removed counts as off screen (asking it raises)."""
+    try:
+        return bool(c.IsOffscreen)
+    except Exception:
+        return True
+
+
+def _elements(doc, kinds, wait=3.0):
+    """[(control, name)] of the given kinds on the page, on-screen first. Waits for Edge to fill the page in."""
+    auto = _auto()
+    t0, out = time.time(), []
+    while True:
+        out = [(c, " ".join((c.Name or "").split())) for c, _d in auto.WalkControl(doc, maxDepth=60)
+               if c.ControlTypeName in kinds]
+        if len(out) > 2 or time.time() - t0 > wait:
+            break
+        time.sleep(0.5)
+    return sorted(out, key=lambda x: _off(x[0]))
+
+
+def _page_name(doc):
+    """'Bing', 'Tailscale': said with every click and typing, so he always knows which page she touched."""
+    return _short(SITE_WORDS.sub("", " ".join((doc.Name or "this page").split()))) or "this page"
+
+
+def _score_name(want, name):
+    w, n = _norm(want), _norm(name)
+    if not w or not n:
+        return 0
+    if w == n:
+        return 1.0
+    if n.startswith(w + " ") or n.endswith(" " + w):
+        return 0.93
+    if re.search(rf"\b{re.escape(w)}\b", n):
+        return 0.9 - min(0.2, len(n) / 400)   # "sign in" inside a long link text counts, but less
+    return difflib.SequenceMatcher(None, w, n).ratio() * (0.95 if len(n) < 40 else 0.8)
+
+
+def _target_win():
+    """Edge in front; or else the Edge window used last, brought to the front."""
+    win = front_window()
+    if win:
+        return win
+    wins = _windows()
+    if not wins:
+        raise EdgeError("Edge isn't open.")
+    _front(wins[0])
+    return wins[0]
+
+
+def _press_control(c):
+    for get in ("GetInvokePattern", "GetTogglePattern", "GetSelectionItemPattern"):
+        try:
+            p = getattr(c, get)()
+            if p:
+                {"GetInvokePattern": lambda: p.Invoke(), "GetTogglePattern": lambda: p.Toggle(),
+                 "GetSelectionItemPattern": lambda: p.Select()}[get]()
+                return
+        except Exception:
+            continue
+    try:
+        c.GetScrollItemPattern().ScrollIntoView()
+    except Exception:
+        pass
+    c.Click(simulateMove=False)
+
+
+def click_on_page(target, confirm=None, **_):
+    """Click a button, link, checkbox or tab on the Edge page by what it says."""
+    target = re.sub(r"^(?:on |the |a )+|\s+(?:button|link|tab|option|icon|checkbox|box)$", "", target.strip(" .!?").lower())
+    win = _target_win()
+    doc = _page_doc(win)
+    els = [(c, n) for c, n in _elements(doc, CLICKABLE) if n]
+    scored = sorted(((round(_score_name(target, n), 2), KIND_ORDER.get(c.ControlTypeName, 5), i, c, n)
+                     for i, (c, n) in enumerate(els)), key=lambda x: (-x[0], x[1], x[2]))
+    if not scored or scored[0][0] < 0.62:
+        return f"I can't find {target} on this page."
+    _s, _k, _i, c, name = scored[0]
+    if RISKY.search(name) or RISKY.search(target):
+        if not confirm or not confirm(f"That will {name.lower()[:60]}. Shall I go ahead?"):
+            return f"Okay, I didn't click {name[:60]}."
+    _press_control(c)
+    return f"Clicked {name[:60]} on {_page_name(doc)}."
+
+
+def type_on_page(text, field=None, submit=False, **_):
+    """Type into a box on the Edge page: the named one ('search', 'email'), or the one in focus, or the first box."""
+    from tools.pc_tools import _clipboard
+    win = _target_win()
+    doc = _page_doc(win)
+    boxes = [(c, n) for c, n in _elements(doc, TYPEABLE) if not _off(c) or field]
+    if not boxes:
+        return "I don't see a box to type in on this page."
+    box = None
+    if field:
+        scored = sorted(((max(_score_name(field, n), _score_name(field, c.AutomationId or "")), i, c)
+                         for i, (c, n) in enumerate(boxes)), key=lambda x: (-x[0], x[1]))
+        if scored[0][0] >= 0.6:
+            box = scored[0][2]
+        elif field.lower().strip() not in ("search", "box", "field", "text box"):
+            return f"I can't find a {field} box on this page."
+    if box is None:
+        focused = _auto().GetFocusedControl()
+        box = next((c for c, _n in boxes if focused and c.NativeWindowHandle == focused.NativeWindowHandle
+                    and c.BoundingRectangle == focused.BoundingRectangle), None) or boxes[0][0]
+    try:
+        if box.GetLegacyIAccessiblePattern().State & 0x20000000:   # STATE_SYSTEM_PROTECTED: a password box
+            return "That's a password box. Type passwords yourself, so they're never said out loud."
+    except Exception:
+        pass
+    box.SetFocus()
+    time.sleep(0.15)
+    pyautogui.hotkey("ctrl", "a")
+    saved = _clipboard()
+    _clipboard(text)
+    pyautogui.hotkey("ctrl", "v")
+    time.sleep(0.25)
+    if saved is not None:
+        _clipboard(saved)
+    if submit:
+        pyautogui.press("enter")
+    label = re.split(r"\s+-\s+", " ".join((box.Name or field or "the box").split()))[0][:40]
+    return f"Typed it into {label} on {_page_name(doc)}" + (" and pressed Enter." if submit else ".")
+
+
+def page_controls(**_):
+    """What he can click or fill in on the Edge page (on screen), so he knows what to say."""
+    win = _target_win()
+    doc = _page_doc(win)
+    els = [n for c, n in _elements(doc, CLICKABLE | TYPEABLE) if n and not _off(c)]
+    seen, names = set(), []
+    for n in els:
+        if n.lower() not in seen and len(n) <= 50:
+            seen.add(n.lower())
+            names.append(n)
+    if not names:
+        return "I don't see anything to click on this page."
+    return f"On screen you can click: {', '.join(names[:12])}" + (", and more." if len(names) > 12 else ".")
+
+
 class _uia:
     """UI Automation needs COM set up in whichever thread calls it (tools can run in worker threads)."""
     def __enter__(self):
@@ -220,6 +394,25 @@ list_tabs = _in_thread(list_tabs)
 close_tabs = _in_thread(close_tabs)
 read_tab = _in_thread(read_tab)
 switch_tab = _in_thread(switch_tab)
+click_on_page = _in_thread(click_on_page)
+type_on_page = _in_thread(type_on_page)
+page_controls = _in_thread(page_controls)
+
+
+def _page_tool(fn):
+    """Spoken reason instead of a crash when Edge isn't there."""
+    def wrapped(*a, **kw):
+        try:
+            return fn(*a, **kw)
+        except EdgeError as e:
+            return str(e)
+    wrapped.__name__ = fn.__name__
+    return wrapped
+
+
+click_on_page = _page_tool(click_on_page)
+type_on_page = _page_tool(type_on_page)
+page_controls = _page_tool(page_controls)
 
 
 def _tool(name, description, props=None, required=None):
@@ -237,5 +430,10 @@ TOOLS = [
     _tool("read_tab", "Read an Edge tab and answer his question about it or summarise it ('what does the expense "
           "manager tab say', 'summarise this tab'). 'name' empty = the tab he's on.",
           {"name": {"type": "string"}, "question": {"type": "string"}}),
+    _tool("type_on_page", "Type text into a box on the Edge page he's on: a search box, a form field. 'field' is the "
+          "box's label ('search', 'email', 'first name'); empty = the box in focus. submit=true presses Enter after.",
+          {"text": {"type": "string"}, "field": {"type": "string"}, "submit": {"type": "boolean"}}, ["text"]),
+    _tool("page_controls", "Say what can be clicked or filled in on the Edge page he's on."),
 ]
-FUNCTIONS = {"list_tabs": list_tabs, "switch_tab": switch_tab, "close_tabs": close_tabs}
+FUNCTIONS = {"list_tabs": list_tabs, "switch_tab": switch_tab, "close_tabs": close_tabs, "type_on_page": type_on_page,
+             "page_controls": page_controls}

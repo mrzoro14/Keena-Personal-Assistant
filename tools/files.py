@@ -280,39 +280,48 @@ def read_text(name, kind=None):
     base = os.path.basename(path)
     if SECRET.search(base):
         return None, f"{base} holds passwords or keys, so I won't read it out."
-    ext = os.path.splitext(base)[1].lower()
     try:
-        if ext == ".pdf":
-            from pypdf import PdfReader
-            text = "\n".join((p.extract_text() or "") for p in PdfReader(path).pages[:15])
-        elif ext == ".docx":
-            import zipfile
-            with zipfile.ZipFile(path) as z:
-                xml = z.read("word/document.xml").decode("utf-8", "ignore")
-            text = re.sub(r"<[^>]+>", "", re.sub(r"</w:p>", "\n", xml))
-        elif ext == ".pptx":
-            import zipfile
-            with zipfile.ZipFile(path) as z:
-                slides = sorted(n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n))
-                text = "\n".join(re.sub(r"<[^>]+>", " ", z.read(s).decode("utf-8", "ignore")) for s in slides[:30])
-        elif ext == ".xlsx":
-            import zipfile
-            with zipfile.ZipFile(path) as z:
-                shared = z.read("xl/sharedStrings.xml").decode("utf-8", "ignore") if "xl/sharedStrings.xml" in z.namelist() else ""
-            text = re.sub(r"<[^>]+>", " ", re.sub(r"</si>", "\n", shared))
-        elif ext in TEXT_EXT or os.path.getsize(path) < 200_000:
-            with open(path, encoding="utf-8", errors="ignore") as f:
-                text = f.read(60_000)
-            if "\x00" in text[:2000]:
-                return None, f"{base} isn't a text file, so I can't read it. Say open it to see it."
-        else:
-            return None, f"I can't read {base}: it isn't a text, PDF, Word or Excel file. Say open it to see it."
+        text = extract(path)
     except Exception as e:
         return None, f"I couldn't read {base}: {e}"
-    text = re.sub(r"[ \t]+", " ", re.sub(r"\n\s*\n+", "\n", html_unescape(text))).strip()
+    if text is None:
+        return None, f"I can't read {base}: it isn't a text, PDF, Word or Excel file. Say open it to see it."
+    if text == "":
+        return None, f"{base} isn't a text file, so I can't read it. Say open it to see it."
     if len(text) < 20:
         return None, f"{base} has no text I can read (it may be scanned images)."
     return path, text
+
+
+def extract(path, pages=15):
+    """The text of a PDF, Word, PowerPoint, Excel or text file. None: not a kind she reads; "": binary."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".pdf":
+        from pypdf import PdfReader
+        text = "\n".join((p.extract_text() or "") for p in PdfReader(path).pages[:pages])
+    elif ext == ".docx":
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            xml = z.read("word/document.xml").decode("utf-8", "ignore")
+        text = re.sub(r"<[^>]+>", "", re.sub(r"</w:p>", "\n", xml))
+    elif ext == ".pptx":
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            slides = sorted(n for n in z.namelist() if re.match(r"ppt/slides/slide\d+\.xml$", n))
+            text = "\n".join(re.sub(r"<[^>]+>", " ", z.read(s).decode("utf-8", "ignore")) for s in slides[:30])
+    elif ext == ".xlsx":
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            shared = z.read("xl/sharedStrings.xml").decode("utf-8", "ignore") if "xl/sharedStrings.xml" in z.namelist() else ""
+        text = re.sub(r"<[^>]+>", " ", re.sub(r"</si>", "\n", shared))
+    elif ext in TEXT_EXT or os.path.getsize(path) < 200_000:
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            text = f.read(60_000)
+        if "\x00" in text[:2000]:
+            return ""
+    else:
+        return None
+    return re.sub(r"[ \t]+", " ", re.sub(r"\n\s*\n+", "\n", html_unescape(text))).strip()
 
 
 def html_unescape(s):

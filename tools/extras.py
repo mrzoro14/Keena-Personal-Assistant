@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REMINDERS_FILE = os.path.join(ROOT, "reminders.json")
 NOTES_FILE = os.path.join(ROOT, "notes.txt")
-DEFAULT_CITY = os.getenv("JARVIS_CITY", "Chennai")
+DEFAULT_CITY = os.getenv("JARVIS_CITY", "").strip()   # empty: wherever the laptop is (wttr.in finds it from the connection)
 
 _lock = threading.Lock()
 
@@ -156,8 +156,9 @@ def read_notes(count=5, **_):
 
 
 # ------------------------------------------------------------------ weather
-def get_weather(city=None, day="today", **_):
-    """Current weather, or the forecast for today/tomorrow/day after, including chance of rain."""
+def get_weather(city=None, day="today", quiet=False, **_):
+    """Current weather, or the forecast for today/tomorrow/day after, including chance of rain.
+    quiet: on failure just say so (the morning briefing mustn't open a browser)."""
     city = (city or DEFAULT_CITY).strip()
     day = (day or "today").lower()
     idx = {"today": 0, "now": 0, "tomorrow": 1, "day after tomorrow": 2, "day after": 2}.get(day, 0)
@@ -166,7 +167,7 @@ def get_weather(city=None, day="today", **_):
                                      headers={"User-Agent": "curl/8"})
         with urllib.request.urlopen(req, timeout=8) as r:
             data = json.loads(r.read().decode("utf-8"))
-        place = city.split(",")[0].title()
+        place = city.split(",")[0].title() if city else data["nearest_area"][0]["areaName"][0]["value"]
         fc = data["weather"][idx]
         rain = max(int(h.get("chanceofrain", 0)) for h in fc["hourly"])
         rain_txt = (f"{rain}% chance of rain" if rain >= 20 else "no rain expected")
@@ -179,9 +180,11 @@ def get_weather(city=None, day="today", **_):
         midday = fc["hourly"][len(fc["hourly"]) // 2]["weatherDesc"][0]["value"].strip().lower()
         return f"{when} in {place}: {midday}, {fc['mintempC']} to {fc['maxtempC']} degrees, {rain_txt}."
     except Exception:
+        if quiet:
+            return ""
         import webbrowser
-        webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote_plus(f"weather {city} {day}"))
-        return f"I couldn't fetch the weather, so I opened a search for {city}."
+        webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote_plus(f"weather {city} {day}".strip()))
+        return f"I couldn't fetch the weather, so I opened a search{' for ' + city if city else ''}."
 
 
 # ------------------------------------------------------------------ look up (Wikipedia)
@@ -447,7 +450,7 @@ TOOLS = [
     _tool("take_note", "Save a note (a to-do, idea or thing to follow up).", {"text": {"type": "string"}}, ["text"]),
     _tool("read_notes", "Read his latest notes.", {"count": {"type": "integer"}}),
     _tool("get_weather", f"Weather now, or the forecast for today/tomorrow (temperatures and chance of rain). "
-          f"City defaults to {DEFAULT_CITY}.",
+          f"City defaults to {DEFAULT_CITY or 'where he is'}.",
           {"city": {"type": "string"}, "day": {"type": "string", "enum": ["today", "tomorrow", "day after tomorrow"]}}),
     _tool("look_up", "Look up a real person, place, company, event or thing on Wikipedia (e.g. 'Narendra Modi', "
           "'Tesla', 'Chennai'). Use it for 'who is', 'what is', 'tell me about' questions about the world.",

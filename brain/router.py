@@ -126,6 +126,72 @@ def _route_files_tabs(t):
             return [("read_file", {"name": name, "question": t})]
     if m := _m(r"rename (?:the |my )?(.+?) (?:to|as) (.+)", t):
         return [("file_action", {"action": "rename", "name": m[1], "to": m[2]})]
+    # inside his documents (tools/docsearch.py): what a file SAYS, not what it's called
+    if m := (_m(r"(?:which|what) (?:of my )?(?:files?|documents?|docs?|pdfs?)(?: of mine)? (?:has|have|had|mentions?|contains?|"
+                r"talks? about|says?|is about|are about|includes?)(?: the word| the words)? (.+)", t) or
+             _m(r"(?:find|search for|look for|get) (?:the |my |a |any )?(?:files?|documents?|docs?|pdfs?) (?:about|on|with|"
+                r"that (?:mentions?|has|contains?|talks? about|says?)|mentioning|containing|which (?:mentions?|has|says?)) (.+)", t) or
+             _m(r"(?:search|look) (?:inside|in|through) (?:all )?(?:my |the )?(?:files|documents|docs|pdfs) for (.+)", t) or
+             _m(r"where (?:did i|have i) (?:write|written|wrote|mention|mentioned|save|saved) (.+)", t) or
+             _m(r"(?:do i have|have i got|are there|is there) (?:any |a )?(?:files?|documents?|docs?|pdfs?) (?:about|on|with|"
+                r"for|mentioning|containing|that (?:mentions?|has|have|says?|talks? about)) (.+)", t)):
+        return [("search_in_files", {"query": m[1]})]
+    return None
+
+
+BOX = r"(?:box|field|bar|section|input|area)"
+
+
+def _route_page_boxes(t):
+    """Boxes and buttons on his Edge page (tools/edge.py). Only when Edge is the browser he's using."""
+    from tools.pc_tools import _use_edge
+    enter = r"(?: and (?:press enter|search|submit|hit enter|go))?"
+    if m := _m(rf"(?:type|write|enter|put)(?: in)? (.+?) (?:in|into|inside|on) (?:the |that |this )?(.+?) {BOX}{enter}", t):
+        text, field = m[1], m[2]
+    elif m := _m(rf"fill (?:in |out )?(?:the |my )?(.+?)(?: {BOX})? with (.+?){enter}", t):
+        text, field = m[2], m[1]
+    else:
+        m = None
+    if m and _use_edge():
+        submit = bool(re.search(r"and (?:press enter|search|submit|hit enter|go)[.!?]*$", t, re.I))
+        return [("type_on_page", {"text": text.strip(" \"'"), "field": field, "submit": submit})]
+    if _m(r"what can i (?:click|press|tap|fill in)(?: on)?(?: (?:this|the) page| here)?|"
+          r"what(?:'s| is) (?:there )?(?:to click|clickable)(?: on (?:this|the) page| here)?|"
+          r"(?:read|list|tell me) (?:the )?(?:buttons|links)(?: on (?:this|the) page)?", t):
+        return [("page_controls", {})]
+    return None
+
+
+WA = r"(?:on |via |in |through |using )?whats ?app"
+
+
+PHONE = r"(?:on |to )(?:my )?(?:phone|mobile|cell)"
+
+
+def _route_whatsapp(t):
+    """WhatsApp (tools/whatsapp.py): the message keeps his exact words (and case); sending always asks first.
+    Also phone alerts (tools/notify.py): checked first, so "send X to my phone" never becomes a chat."""
+    if _m(rf"(?:tell|notify|ping|alert|let) (?:me|know)(?: know)? {PHONE} when (?:the |my |this )?(?:download|file)s?"
+          r"(?: is| are)? (?:done|finished|finishes|complete|completes|downloaded)|"
+          rf"(?:tell|notify|ping|alert) me when (?:the |my )?downloads? (?:is |are )?(?:done|finished|finishes|completes?) {PHONE}", t):
+        return [("watch_download", {})]
+    if m := (_m(rf"(?:send|push|text) (.+?) {PHONE}", t) or _m(rf"(?:send|push) {PHONE}(?: that)?:? (.+)", t)):
+        return [("notify_phone", {"message": m[1].strip(" \"'")})]
+    if m := (_m(rf"(?:send|write|drop)(?: a)?(?: {WA})?(?: message| msg| text)? to (.+?)(?: {WA})?"
+                r"(?: saying| that says| telling (?:him|her|them)|,|:| that)\s+(.+)", t) or
+             _m(rf"(?:whats ?app|message|text) (.+?)(?: {WA})?(?: saying| that says|,|:| that)\s+(.+)", t) or
+             _m(rf"send (.+?) a (?:whats ?app|message|text|msg)(?: {WA})?(?: saying| that says|,|:| that)\s+(.+)", t) or
+             _m(rf"tell (.+?) {WA}(?: that)?\s+(.+)", t) or
+             _m(rf"(?:message|text|whats ?app) (.+?)(?: {WA})? and (?:tell|say to|let) (?:him|her|them)(?: know)?(?: that)?,?\s+(.+)", t)):
+        return [("send_whatsapp", {"contact": m[1].strip(" ,"), "message": m[2].strip()})]
+    if _m(rf"(?:read|check|show)(?: me)?(?: all)? (?:my )?(?:new |unread |latest |recent )?{WA}(?: messages| chats| msgs)?|"
+          rf"(?:do i have |have i got |are there |any )(?:any )?(?:new |unread )?(?:{WA} )?(?:messages|msgs) (?:on |in )?{WA}|"
+          rf"(?:do i have |have i got |any )(?:any )?(?:new |unread )?{WA} (?:messages|msgs)|"
+          rf"(?:what(?:'s| is) new|anything new) {WA}", t):
+        return [("read_whatsapp", {})]
+    if m := (_m(rf"what (?:did|has) (.+?) (?:say|said|send|sent|text|texted|write|written)(?: me)? {WA}", t) or
+             _m(rf"read (?:me )?(.+?)'s? (?:{WA} )?(?:messages?|msgs?|chat)(?: {WA})?", t)):
+        return [("read_whatsapp", {"contact": m[1]})]
     return None
 
 
@@ -420,6 +486,10 @@ def _route_text(text):
         return None
     if steps := _site_search(t):
         return steps
+    # a message is one piece even with "and" in it ("saying I'm late and will call"), so it's matched whole
+    whole = _route_whatsapp(t.strip(" ,.!?"))
+    if whole and whole[0][0] in ("send_whatsapp", "notify_phone"):
+        return _own_words(whole, text)
     parts = [p.strip(" ,.") for p in re.split(r",? (?:and then|and also|and|then|after that) ", t)]
     if len(parts) > 3:
         return None
@@ -430,12 +500,21 @@ def _route_text(text):
             return None  # any part we don't understand -> let the brain handle the whole thing
         steps += one
     steps = _merge_open_then_search(steps)
-    # Typed text keeps your original capitals ("type Hello World", not "hello world")
+    return _own_words(steps, text)
+
+
+# text he dictates keeps his original capitals ("type Hello World", "tell Arjun I'm in London"), not lowercase
+OWN_WORDS = {"type_text": ("text",), "type_on_page": ("text",), "send_whatsapp": ("contact", "message"),
+             "notify_phone": ("message",)}
+
+
+def _own_words(steps, text):
+    low = text.lower()
     for name, args in steps:
-        if name == "type_text":
-            i = text.lower().find(args["text"])
+        for key in OWN_WORDS.get(name, ()):
+            i = low.find(args.get(key) or "\0")
             if i >= 0:
-                args["text"] = text[i:i + len(args["text"])]
+                args[key] = text[i:i + len(args[key])]
     return steps
 
 
@@ -456,6 +535,8 @@ def _route_one(t):
                 r"(?:" + POLITE + r")?type (?:one by one |exactly |down )?(?:what(?:ever)? i (?:say|speak|tell you)|as i (?:say|speak)|"
                 r"after me|everything i say)", t, re.I):
         return [("start_dictation", {})]
+    if steps := _route_page_boxes(t):   # "type X in the search box": a box on the Edge page, before plain typing
+        return steps
     if m := re.match(POLITE + r"type(?: out)? (.+?)[.!?]*$", t, re.I):
         # "type the draft again" refers to something; it once typed the words "the draft again in the notepad"
         if re.match(r"(?:the |that |this |my |a |an )?(?:draft|email|mail|content|message|letter|it|that|this|"
@@ -494,7 +575,7 @@ def _route_one(t):
     # Files anywhere and every Edge tab (tools/files.py, tools/edge.py): before the browser and close rules, so
     # "close all the YouTube tabs" isn't close_app, and "summarise the second one" reads the file instead of the
     # model making up a summary
-    if steps := _route_files_tabs(t):
+    if steps := _route_files_tabs(t) or _route_whatsapp(t):
         return steps
     # Driving the browser page he's on (Jarvis's own Chrome window): before media/YouTube, so "play the second video"
     # picks a result instead of searching YouTube for "the second video"
