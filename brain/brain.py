@@ -167,7 +167,7 @@ MAX_STEPS = 8      # tool rounds per request, stops runaway loops
 # Once a request has read some, these actions ask him first for the rest of that request.
 READS_OUTSIDE = {"web_answer", "page_answer", "read_file", "read_tab", "read_whatsapp", "search_in_files",
                  "browser_results", "look_up", "search_web", "shop_for", "read_clipboard", "read_notes",
-                 "check_email", "read_email", "calendar_day", "next_event"}
+                 "check_email", "read_email", "calendar_day", "next_event", "look_at_screen"}
 ASK_AFTER_READING = {"file_action", "type_text", "type_on_page", "press_keys", "browser_click", "click_on_page",
                      "open_website", "open_file", "draft_email", "send_whatsapp", "notify_phone", "run_routine",
                      "close_app", "close_tab", "close_tabs", "clear_reminders", "remember", "take_note",
@@ -1145,7 +1145,7 @@ INFO_TOOLS = {"system_status", "remember", "draft_email", "recall", "forget_last
               "find_files", "read_file", "list_folder", "file_action", "list_tabs", "read_tab", "switch_tab",
               "close_tabs", "search_in_files", "send_whatsapp", "read_whatsapp", "type_on_page", "page_controls",
               "notify_phone", "watch_download", "check_email", "read_email", "calendar_day", "next_event", "diary",
-              "spotify_play"} | SPOKEN_TOOLS   # these answer a question, so no "Done." in front
+              "spotify_play", "mic", "look_at_screen"} | SPOKEN_TOOLS   # these answer a question, so no "Done." in front
 
 
 def _spoken(outputs):

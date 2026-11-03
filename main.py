@@ -153,6 +153,16 @@ def voice_mode():
         pass
     mic = Mic()
     hud.boot("MICROPHONE")
+    from tools import micctl
+
+    def set_mic(muted):   # the orb's mic button, "mute your mic", or "turn your mic on" from the phone
+        mic.mute(muted)
+        hud.send(muted=muted)
+        print(f"\n   [mic {'OFF: muted' if muted else 'on'}]")
+
+    mic.muted = micctl.saved_muted()   # muted before a restart: stays muted
+    micctl.register(set_mic, mic.muted)
+    hud.send(muted=mic.muted)
 
     timing = {}
 
@@ -438,12 +448,19 @@ def voice_mode():
         while True:
             if time.time() >= next_check:  # reminders: check about once a second
                 next_check = time.time() + 1
+                hud.send(muted=mic.muted)   # the orb's mic button shows the real state (the orb may have restarted)
                 if announce_due(then_idle=True):
                     print(f'\nWaiting for "{config.ASSISTANT_NAME}"...  (or press Enter)')
                 if time.time() >= summaries_due[0] and not summarizing.is_set():
                     summaries_due[0] = time.time() + 60   # finished conversations -> summaries, while idle
                     summarizing.set()
                     threading.Thread(target=summarize_in_background, daemon=True).start()
+            if mic.muted:   # mic off (the orb's button): nothing is heard until it's turned back on
+                if enter.is_set():
+                    enter.clear()
+                    print("\n[the mic is muted: tap the mic button next to the orb to turn it on]")
+                time.sleep(0.25)
+                continue
             frame = mic.read(timeout=0.25)
             if enter.is_set():
                 print("\r" + " " * 100 + "\r[woken by Enter]")

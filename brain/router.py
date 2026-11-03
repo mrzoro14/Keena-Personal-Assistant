@@ -205,7 +205,22 @@ MUSIC_APP = __import__("os").getenv("MUSIC_APP", "youtube").strip().lower()
 
 def _route_life(t):
     """Gmail (tools/gmail.py), calendar (tools/gcal.py), Spotify (tools/spotify.py) and the PC diary
-    (tools/diary.py). Reading only: writing mail is draft_email, which asks before sending."""
+    (tools/diary.py). Reading only: writing mail is draft_email, which asks before sending.
+    Also her own mic (tools/micctl.py): "mute your mic" (a bare "mute" is still the PC's sound)."""
+    # Her eyes (tools/vision.py): the whole sentence is the question ("read this error", "what's on my screen")
+    if _m(r"(?:what(?:'s| is)|what do you see) on (?:my|the) screen.*|what am i (?:looking at|seeing).*|"
+          r"(?:look at|check|read|see|describe|explain) (?:my|the|this) screen.*|can you see (?:my|the) screen.*|"
+          r"(?:read|explain) (?:this|that) (?:error|message|text|page|code|chart|graph|popup|pop-up|dialog|"
+          r"warning|notification)(?: on (?:my|the) screen)?.*|what does (?:this|that|it) (?:say|mean)(?: on (?:my|the) screen)?|"
+          r"what(?:'s| is) (?:this|that) (?:error|message|popup|pop-up|warning|window)|"
+          r"(?:what|which) (?:app|game|website|site|page|video|song|movie) is (?:this|that|on (?:my|the) screen)", t):
+        return [("look_at_screen", {"question": t})]
+    if _m(r"(?:mute|turn off|switch off|disable) (?:your|the|ur) (?:mic|microphone)|mute yourself|"
+          r"stop listening(?: to me)?|(?:your|the) mic off", t):
+        return [("mic", {"on": False})]
+    if _m(r"(?:unmute|turn on|switch on|enable) (?:your|the|ur) (?:mic|microphone)|unmute yourself|"
+          r"turn (?:your|the) (?:mic|microphone) (?:back )?on|(?:your|the) mic (?:back )?on|start listening(?: again)?", t):
+        return [("mic", {"on": True})]
     # Gmail: one email read out, or the list of new ones
     if m := _m(rf"(?:read|open|show)(?: me)?(?: the| my)? (?:latest |last |newest |new |recent )?{MAIL} (?:from|by) (.+)", t) or \
             _m(rf"what did (.+?) (?:e-?mail|mail|send) me(?: about)?", t):
@@ -554,8 +569,8 @@ def _route_text(text):
     if steps := _site_search(t):
         return steps
     # a message is one piece even with "and" in it ("saying I'm late and will call"), so it's matched whole
-    whole = _route_whatsapp(t.strip(" ,.!?"))
-    if whole and whole[0][0] in ("send_whatsapp", "notify_phone"):
+    whole = _route_whatsapp(t.strip(" ,.!?")) or _route_life(t.strip(" ,.!?"))
+    if whole and whole[0][0] in ("send_whatsapp", "notify_phone", "look_at_screen"):   # also "look at my screen and ..."
         return _own_words(whole, text)
     parts = [p.strip(" ,.") for p in re.split(r",? (?:and then|and also|and|then|after that) ", t)]
     if len(parts) > 3:
@@ -573,7 +588,7 @@ def _route_text(text):
 # text he dictates keeps his original capitals ("type Hello World", "tell Arjun I'm in London"), not lowercase
 OWN_WORDS = {"type_text": ("text",), "type_on_page": ("text",), "send_whatsapp": ("contact", "message"),
              "notify_phone": ("message",), "read_email": ("sender", "about"), "diary": ("about",),
-             "spotify_play": ("what",)}
+             "spotify_play": ("what",), "look_at_screen": ("question",)}
 
 
 def _own_words(steps, text):

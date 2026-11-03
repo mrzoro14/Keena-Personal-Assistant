@@ -26,6 +26,7 @@ TOOL_WORDS = re.compile(r"\b(?:remind(?:er|ers)?|timer|alarm|weather|forecast|sc
                         # his mail, calendar and PC diary: the chat side can't see them and made answers up
                         # ("nobody emailed you", "you worked on the project yesterday")
                         r"e-?mail(?:ed|s)?|mails?|inbox|calendar|schedule|agenda|appointments?|diary|"
+                        r"(?:my|the|this) screen|on screen|looking at|"
                         r"(?:anything|something|what(?:'s| is)?) (?:planned|on)|plans for|(?:free|busy) (?:on|this|tomorrow|today)|"
                         r"(?:on|at|using) (?:the|my) (?:pc|laptop|computer))\b")
 

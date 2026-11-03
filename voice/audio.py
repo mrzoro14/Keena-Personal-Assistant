@@ -30,11 +30,26 @@ class Mic:
             callback=self._callback,
         )
 
+        self.muted = False
+
     def _callback(self, indata, frames, time_info, status):
         self.q.put(indata[:, 0].copy())
 
     def start(self):
-        self.stream.start()
+        if not self.muted:
+            self.stream.start()
+
+    def mute(self, on):
+        """Mic off for real: the stream is stopped (Windows' mic-in-use light goes out), not just ignored."""
+        on = bool(on)
+        if on == self.muted:
+            return
+        self.muted = on
+        try:
+            self.stream.stop() if on else self.stream.start()
+        except Exception as e:
+            print(f"   [mic: {e!r}]")
+        self.clear()
 
     def read(self, timeout=None):
         """Next 80 ms frame. With a timeout, returns None if nothing arrived in time."""

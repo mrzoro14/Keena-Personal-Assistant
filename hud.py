@@ -165,6 +165,8 @@ class Hud(QWidget):
                 self.set_mode("small")   # the new window would open BEHIND a full-screen HUD
         if "stat" in msg:
             self.stat = str(msg["stat"])
+        if "muted" in msg and getattr(self, "mic_button", None):
+            self.mic_button.set_muted(msg["muted"])
 
     def read_socket(self):
         while True:
@@ -601,6 +603,93 @@ class Hud(QWidget):
         return y + 6
 
 
+MIC_PORT = 47322     # tools/micctl.py in Jarvis's process: the button's clicks go there
+RED = QColor(255, 70, 95)
+
+
+class MicButton(QWidget):
+    """The mic mute button beside the orb: always there (the orb itself fades out and lets clicks through).
+    Pink mic = she can hear; red, crossed out = the mic is off (really stopped, not just ignored)."""
+    SIZE = 44
+
+    def __init__(self, orb):
+        super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WindowDoesNotAcceptFocus)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setCursor(Qt.PointingHandCursor)
+        self.orb, self.muted, self.hover, self.known = orb, False, False, False
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.place()
+        self._tip()
+        self.show()
+
+    def place(self):
+        """Just left of the orb's bottom corner, so it never covers the orb's text."""
+        g = self.orb.geometry() if self.orb.mode == "small" else None
+        if g is None:
+            geo = QApplication.primaryScreen().availableGeometry()
+            w, h = int(W * self.orb.scale), int(H * self.orb.scale)
+            x = geo.left() + 16 if "left" in self.orb.position else geo.right() - w - 16
+            y = geo.top() + 16 if "top" in self.orb.position else geo.bottom() - h - 16
+            g = QRectF(x, y, w, h).toRect()
+        left = "left" in self.orb.position
+        x = g.right() + 8 if left else g.left() - self.SIZE - 8
+        self.setGeometry(x, g.bottom() - self.SIZE - 4, self.SIZE, self.SIZE)
+
+    def _tip(self):
+        self.setToolTip(f"{ASSISTANT_NAME}'s mic is OFF: click to turn it on" if self.muted
+                        else f"Mute {ASSISTANT_NAME}'s mic")
+
+    def set_muted(self, muted):
+        self.known = True
+        if bool(muted) != self.muted:
+            self.muted = bool(muted)
+            self._tip()
+            self.update()
+
+    def mousePressEvent(self, e):
+        if e.button() != Qt.LeftButton:
+            return
+        self.set_muted(not self.muted)   # shown at once; Jarvis confirms within a second
+        try:
+            self.sock.sendto(json.dumps({"mute": self.muted}).encode(), ("127.0.0.1", MIC_PORT))
+        except OSError:
+            pass
+
+    def enterEvent(self, _):
+        self.hover = True
+        self.update()
+
+    def leaveEvent(self, _):
+        self.hover = False
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        s = self.SIZE
+        accent = RED if self.muted else CYAN
+        # quiet when on (it's always on screen), bright when muted so he can't forget
+        p.setOpacity(1.0 if self.muted or self.hover else 0.6)
+        p.setBrush(QColor(20, 6, 16, 215))
+        p.setPen(QPen(rgba(accent, 255 if self.hover or self.muted else 170), 2))
+        p.drawEllipse(QRectF(3, 3, s - 6, s - 6))
+        # the mic: a capsule, its cradle and stand
+        p.setPen(QPen(accent, 2.2, Qt.SolidLine, Qt.RoundCap))
+        p.setBrush(rgba(accent, 60))
+        p.drawRoundedRect(QRectF(s / 2 - 4.5, s * 0.24, 9, 14), 4.5, 4.5)
+        p.setBrush(Qt.NoBrush)
+        path = QPainterPath()
+        path.arcMoveTo(QRectF(s / 2 - 8, s * 0.30, 16, 14), 180)
+        path.arcTo(QRectF(s / 2 - 8, s * 0.30, 16, 14), 180, 180)
+        p.drawPath(path)
+        p.drawLine(QPointF(s / 2, s * 0.30 + 14), QPointF(s / 2, s * 0.74))
+        p.drawLine(QPointF(s / 2 - 5, s * 0.74), QPointF(s / 2 + 5, s * 0.74))
+        if self.muted:
+            p.setPen(QPen(RED, 3, Qt.SolidLine, Qt.RoundCap))
+            p.drawLine(QPointF(s * 0.28, s * 0.26), QPointF(s * 0.72, s * 0.76))
+
+
 def _ease(x):
     return 1 - (1 - x) ** 3
 
@@ -640,6 +729,9 @@ def main():
         hud = Hud(demo="--demo" in sys.argv, parent=parent, position=arg("--position", "bottom-right"), scale=scale)
         if "--big" in sys.argv:   # python hud.py --demo --big : preview big screen mode
             hud.set_mode("big")
+        import os
+        if os.getenv("HUD_MIC_BUTTON", "1") != "0" and (parent or "--demo" in sys.argv):
+            hud.mic_button = MicButton(hud)   # HUD_MIC_BUTTON=0 in .env hides it
     except OSError:
         print("HUD already running (port busy).")
         return
