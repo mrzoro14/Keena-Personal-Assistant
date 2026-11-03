@@ -41,6 +41,11 @@ def _background_tab(url):
     """A tab that opens behind the one he's looking at."""
     b = _connect(True)
     ctx = b.contexts[0]
+    if not ctx.pages:   # Chrome just started: a tab can only open behind another one once a window exists
+        try:
+            ctx.wait_for_event("page", timeout=3000)
+        except Exception:
+            ctx.new_page()
     with ctx.expect_page(timeout=10000) as info:
         b.new_browser_cdp_session().send("Target.createTarget", {"url": url, "background": True, "newWindow": False})
     return info.value

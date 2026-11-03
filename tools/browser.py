@@ -152,34 +152,55 @@ def _connect(launch):
     b = _state["browser"]
     if b and b.is_connected():
         return b
-    if not _port_open():
-        if not launch:
-            raise BrowserError(NOT_OPEN)
-        if not CHROME_PATH:
-            raise BrowserError("I can't find Chrome on this PC.")
-        os.makedirs(BROWSER_PROFILE, exist_ok=True)
-        subprocess.Popen([CHROME_PATH, f"--remote-debugging-port={BROWSER_PORT}", f"--user-data-dir={BROWSER_PROFILE}",
-                          "--no-first-run", "--no-default-browser-check", "--start-maximized",
-                          "--autoplay-policy=no-user-gesture-required"])
-        for _ in range(60):
-            if _port_open():
-                break
-            time.sleep(0.15)
-        else:
-            raise BrowserError("Chrome didn't start.")
     if _state["pw"] is None:
         from playwright.sync_api import sync_playwright
         _state["pw"] = sync_playwright().start()
-    # first start after a reboot: the port answers before Chrome's DevTools endpoint does (ECONNREFUSED; the
-    # search fell back to his normal browser). Retry for a few seconds.
-    for attempt in range(6):
+    if _port_open():
+        # her Chrome is already open (left from an earlier run): attach to it. Chrome 156 refuses this
+        # ("Browser context management is not supported"); then it's closed and started again below.
+        # First start after a reboot: the port answers before DevTools does, so a few tries.
+        for attempt in range(4):
+            try:
+                _state["browser"] = _state["pw"].chromium.connect_over_cdp(f"http://127.0.0.1:{BROWSER_PORT}",
+                                                                           timeout=15000)
+                return _state["browser"]
+            except Exception as e:
+                if "not supported" in str(e):
+                    _close_her_chrome()
+                    break
+                if attempt == 3:
+                    raise
+                time.sleep(1.0)
+    if not launch:
+        raise BrowserError(NOT_OPEN)
+    if not CHROME_PATH:
+        raise BrowserError("I can't find Chrome on this PC.")
+    # Playwright starts her Chrome itself (works with every Chrome version). It closes when Edith closes.
+    os.makedirs(BROWSER_PROFILE, exist_ok=True)
+    ctx = _state["pw"].chromium.launch_persistent_context(
+        BROWSER_PROFILE, executable_path=CHROME_PATH, headless=False, no_viewport=True,
+        ignore_default_args=["--enable-automation"],   # no "controlled by automated software" bar
+        args=[f"--remote-debugging-port={BROWSER_PORT}", "--no-first-run", "--no-default-browser-check",
+              "--start-maximized", "--autoplay-policy=no-user-gesture-required"])
+    _state["browser"] = ctx.browser
+    return ctx.browser
+
+
+def _close_her_chrome():
+    """Close the Chrome window that uses HER profile (never his normal Chrome), so it can be started again."""
+    import psutil
+    for p in psutil.process_iter(["name", "cmdline"]):
         try:
-            _state["browser"] = _state["pw"].chromium.connect_over_cdp(f"http://127.0.0.1:{BROWSER_PORT}", timeout=15000)
-            return _state["browser"]
-        except Exception:
-            if attempt == 5:
-                raise
-            time.sleep(1.0)
+            if (p.info["name"] or "").lower() == "chrome.exe" and any(BROWSER_PROFILE.lower() in (a or "").lower()
+                                                                     for a in p.info["cmdline"] or []):
+                p.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    for _ in range(30):
+        if not _port_open():
+            break
+        time.sleep(0.2)
+    time.sleep(1.0)   # the profile lock is released a moment after the process ends
 
 
 def _pages(b):
